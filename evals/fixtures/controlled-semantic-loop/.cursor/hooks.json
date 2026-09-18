@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "node packages/cli/dist/index.js hook cursor preToolUse"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "node packages/cli/dist/index.js hook cursor postToolUse"
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "node packages/cli/dist/index.js hook cursor postToolUseFailure"
+      }
+    ]
+  }
+}

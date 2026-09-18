@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "hooks": {
+    "preToolUse": [
+      {
+        "command": "athena hook cursor preToolUse"
+      }
+    ],
+    "postToolUse": [
+      {
+        "command": "athena hook cursor postToolUse"
+      }
+    ],
+    "postToolUseFailure": [
+      {
+        "command": "athena hook cursor postToolUseFailure"
+      }
+    ]
+  }
+}
