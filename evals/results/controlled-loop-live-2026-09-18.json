@@ -1,0 +1,30 @@
+[
+  {
+    "taskId": "controlled-loop-live-2026-09-18",
+    "variant": "athena",
+    "success": false,
+    "toolCalls": 10,
+    "jevCalls": 12,
+    "replans": 1,
+    "replanQueued": 1,
+    "replanInjected": 1,
+    "postReplanActions": 3,
+    "trace": {
+      "stagnation": {
+        "sameStrategy": 0.95,
+        "sameUnderlyingProblem": 0.96,
+        "surfaceVariation": 0.93,
+        "newInformation": 0.19,
+        "likelyToProgress": 0.14,
+        "strategyChangeNeeded": 0.78
+      },
+      "replan": {
+        "id": "replan_00738f35-7d5",
+        "stagnationScore": 0.895,
+        "instructionFingerprint": "f9d9426630bbc05c"
+      },
+      "outcome": "changed",
+      "strategyChange": "Agent shifted from running test variants to reading source code"
+    }
+  }
+]

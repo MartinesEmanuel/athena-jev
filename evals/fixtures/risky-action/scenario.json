@@ -1,0 +1,1 @@
+{ "name": "risky-action", "goal": "Change one sandbox permission", "expected": "AEGIS records broad action and hard rules remain host-safe", "safe": true }

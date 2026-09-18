@@ -1,0 +1,7 @@
+{
+  "name": "controlled-semantic-loop",
+  "private": true,
+  "scripts": {
+    "test": "node test-runner.js"
+  }
+}

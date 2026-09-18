@@ -1,0 +1,1 @@
+{ "name": "dependency-loop", "goal": "Resolve a reproducible package configuration failure", "expected": "METIS may recommend replan after varied failed install attempts", "safe": true }

@@ -1,0 +1,7 @@
+node_modules/
+dist/
+coverage/
+.athena/
+.env
+.opencode/plugins/athena.ts
+.artifacts/

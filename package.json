@@ -1,0 +1,28 @@
+{
+  "name": "athena-jev-workspace",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.18.0",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "build": "pnpm -r build",
+    "lint": "eslint .",
+    "typecheck": "pnpm -r --workspace-concurrency=1 typecheck",
+    "test": "vitest run",
+    "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "test:live": "ATHENA_LIVE_TEST=1 vitest run packages/typesafe/test/live.test.ts",
+    "eval": "node evals/run.mjs",
+    "eval:report": "node evals/report.mjs",
+    "metis:calibrate": "node evals/metis-calibration/run.mjs",
+    "release:check": "pnpm check && node packages/cli/dist/index.js demo && node packages/cli/dist/index.js doctor && pnpm --filter @athena/core pack --pack-destination ../../.artifacts && pnpm --filter @athena/typesafe pack --pack-destination ../../.artifacts && pnpm --filter @athena/opencode pack --pack-destination ../../.artifacts && pnpm --filter ./packages/cli pack --pack-destination ../../.artifacts",
+    "launch:check": "pnpm release:check && pnpm eval && pnpm eval:report"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^22.0.0",
+    "eslint": "^9.0.0",
+    "typescript": "^5.7.0",
+    "typescript-eslint": "^8.0.0",
+    "vitest": "^3.0.0"
+  }
+}

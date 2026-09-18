@@ -1,0 +1,1 @@
+{ "name": "straightforward-fix", "goal": "Fix one typo and run focused test", "expected": "ATHENA allows normal progress without replan", "safe": true }

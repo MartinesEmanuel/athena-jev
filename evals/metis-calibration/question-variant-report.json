@@ -1,0 +1,15 @@
+{
+  "timestamp": "2026-09-18T05:29:00.470Z",
+  "variants": {
+    "v1": {
+      "questionCount": 4,
+      "medianLatencyMs": 283
+    },
+    "v2": {
+      "questionCount": 6,
+      "medianLatencyMs": 278
+    }
+  },
+  "selectedVariant": "v2",
+  "reason": "v2 separates strategy, unresolved problem, surface variation, and new evidence into atomic questions."
+}

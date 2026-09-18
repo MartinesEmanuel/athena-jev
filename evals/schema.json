@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["taskId", "variant", "success", "toolCalls", "durationMs"],
+  "properties": {
+    "taskId": { "type": "string" }, "variant": { "enum": ["baseline", "athena"] },
+    "success": { "type": "boolean" }, "toolCalls": { "type": "integer", "minimum": 0 },
+    "repeatedToolCalls": { "type": "integer", "minimum": 0 }, "failedToolCalls": { "type": "integer", "minimum": 0 },
+    "highRiskCalls": { "type": "integer", "minimum": 0 }, "agentTokens": { "type": "integer", "minimum": 0 },
+    "jevCalls": { "type": "integer", "minimum": 0 }, "jevLatencyMs": { "type": "number", "minimum": 0 },
+    "replans": { "type": "integer", "minimum": 0 }, "replanRecommendations": { "type": "integer", "minimum": 0 }, "riskInterventions": { "type": "integer", "minimum": 0 }, "completionEvaluations": { "type": "integer", "minimum": 0 }, "jevFailures": { "type": "integer", "minimum": 0 }, "prematureCompletion": { "type": "boolean" },
+    "humanIntervention": { "type": "integer", "minimum": 0 }, "durationMs": { "type": "number", "minimum": 0 }
+  }
+}

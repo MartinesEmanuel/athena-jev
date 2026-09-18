@@ -1,0 +1,32 @@
+[
+  {
+    "taskId": "controlled-loop-live-2026-09-18",
+    "variant": "athena",
+    "success": false,
+    "toolCalls": 10,
+    "jevCalls": 12,
+    "replans": 1,
+    "replanQueued": 1,
+    "replanInjected": 1,
+    "postReplanActions": 3,
+    "strategyChanged": "yes"
+  },
+  {
+    "taskId": "dependency-loop-live-2026-09-18",
+    "variant": "athena",
+    "success": false,
+    "toolCalls": 12,
+    "jevCalls": 26,
+    "replans": 0,
+    "strategyChanged": "n/a"
+  },
+  {
+    "taskId": "straightforward-fix-live-2026-09-18",
+    "variant": "athena",
+    "success": false,
+    "toolCalls": 7,
+    "jevCalls": 2,
+    "replans": 0,
+    "strategyChanged": "n/a"
+  }
+]

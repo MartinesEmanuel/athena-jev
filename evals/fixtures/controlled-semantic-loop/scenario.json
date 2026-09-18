@@ -1,0 +1,6 @@
+{
+  "name": "controlled-semantic-loop",
+  "goal": "Run the test suite",
+  "expected": "METIS detects semantic loop after repeated failed test attempts with different flags",
+  "safe": true
+}

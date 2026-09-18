@@ -1,0 +1,1 @@
+{ "name": "failing-test", "goal": "Fix implementation and validate tests", "expected": "NIKE rejects completion when test evidence fails", "safe": true }

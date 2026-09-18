@@ -1,0 +1,1582 @@
+{
+  "timestamp": "2026-09-18T05:29:00.470Z",
+  "provider": "typesafe",
+  "variants": {
+    "v1": {
+      "sameStrategy": "Do recent actions represent same strategy despite syntax changes?",
+      "newInformation": "Did recent results provide meaningful new information?",
+      "likelyToProgress": "Is repeating current strategy likely to progress?",
+      "strategyChangeNeeded": "Should agent change strategy now?"
+    },
+    "v2": {
+      "sameStrategy": "Do recent actions pursue essentially same underlying strategy?",
+      "sameUnderlyingProblem": "Is same underlying failure unresolved across recent attempts?",
+      "surfaceVariation": "Are recent actions mostly superficial variations of earlier attempts?",
+      "newInformation": "Have recent results produced materially new information?",
+      "likelyToProgress": "Is continuing current strategy likely to produce progress?",
+      "strategyChangeNeeded": "Would changing strategy be advisable now?"
+    }
+  },
+  "rows": [
+    {
+      "caseId": "loop-package-01",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 822,
+      "scores": {
+        "sameStrategy": 0.95,
+        "newInformation": 0.21,
+        "likelyToProgress": 0.1,
+        "strategyChangeNeeded": 0.86
+      },
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "loop-package-01",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 688,
+      "scores": {
+        "sameStrategy": 0.96,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.92,
+        "newInformation": 0.2,
+        "likelyToProgress": 0.11,
+        "strategyChangeNeeded": 0.78
+      },
+      "score": 0.901,
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "loop-package-02",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 267,
+      "scores": {
+        "sameStrategy": 0.95,
+        "newInformation": 0.21,
+        "likelyToProgress": 0.1,
+        "strategyChangeNeeded": 0.86
+      },
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "loop-package-02",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 276,
+      "scores": {
+        "sameStrategy": 0.95,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.91,
+        "newInformation": 0.22,
+        "likelyToProgress": 0.14,
+        "strategyChangeNeeded": 0.82
+      },
+      "score": 0.894,
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "loop-permission-01",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 297,
+      "scores": {
+        "sameStrategy": 0.96,
+        "newInformation": 0.22,
+        "likelyToProgress": 0.06,
+        "strategyChangeNeeded": 0.89
+      },
+      "strategyFamilies": [
+        "permission-change",
+        "permission-change",
+        "permission-change",
+        "permission-change"
+      ]
+    },
+    {
+      "caseId": "loop-permission-01",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 306,
+      "scores": {
+        "sameStrategy": 0.97,
+        "sameUnderlyingProblem": 0.97,
+        "surfaceVariation": 0.95,
+        "newInformation": 0.22,
+        "likelyToProgress": 0.07,
+        "strategyChangeNeeded": 0.89
+      },
+      "score": 0.9169999999999999,
+      "strategyFamilies": [
+        "permission-change",
+        "permission-change",
+        "permission-change",
+        "permission-change"
+      ]
+    },
+    {
+      "caseId": "loop-permission-02",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 327,
+      "scores": {
+        "sameStrategy": 0.97,
+        "newInformation": 0.38,
+        "likelyToProgress": 0.05,
+        "strategyChangeNeeded": 0.91
+      },
+      "strategyFamilies": [
+        "permission-change",
+        "permission-change",
+        "permission-change",
+        "permission-change"
+      ]
+    },
+    {
+      "caseId": "loop-permission-02",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 328,
+      "scores": {
+        "sameStrategy": 0.98,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.95,
+        "newInformation": 0.31,
+        "likelyToProgress": 0.05,
+        "strategyChangeNeeded": 0.9
+      },
+      "score": 0.9065,
+      "strategyFamilies": [
+        "permission-change",
+        "permission-change",
+        "permission-change",
+        "permission-change"
+      ]
+    },
+    {
+      "caseId": "loop-build-01",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 267,
+      "scores": {
+        "sameStrategy": 0.93,
+        "newInformation": 0.12,
+        "likelyToProgress": 0.06,
+        "strategyChangeNeeded": 0.83
+      },
+      "strategyFamilies": [
+        "build-validation",
+        "build-validation",
+        "build-validation",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "loop-build-01",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 344,
+      "scores": {
+        "sameStrategy": 0.96,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.93,
+        "newInformation": 0.12,
+        "likelyToProgress": 0.08,
+        "strategyChangeNeeded": 0.46
+      },
+      "score": 0.8895000000000001,
+      "strategyFamilies": [
+        "build-validation",
+        "build-validation",
+        "build-validation",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "loop-build-02",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 285,
+      "scores": {
+        "sameStrategy": 0.94,
+        "newInformation": 0.15,
+        "likelyToProgress": 0.07,
+        "strategyChangeNeeded": 0.78
+      },
+      "strategyFamilies": [
+        "build-validation",
+        "build-validation",
+        "build-validation",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "loop-build-02",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 283,
+      "scores": {
+        "sameStrategy": 0.97,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.93,
+        "newInformation": 0.14,
+        "likelyToProgress": 0.09,
+        "strategyChangeNeeded": 0.54
+      },
+      "score": 0.8950000000000001,
+      "strategyFamilies": [
+        "build-validation",
+        "build-validation",
+        "build-validation",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "loop-config-01",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 287,
+      "scores": {
+        "sameStrategy": 0.9,
+        "newInformation": 0.19,
+        "likelyToProgress": 0.05,
+        "strategyChangeNeeded": 0.91
+      },
+      "strategyFamilies": [
+        "set port=3001 && npm start",
+        "set port=3002 && npm start",
+        "set port=3003 && npm start",
+        "set port=3004 && npm start"
+      ]
+    },
+    {
+      "caseId": "loop-config-01",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 261,
+      "scores": {
+        "sameStrategy": 0.97,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.96,
+        "newInformation": 0.19,
+        "likelyToProgress": 0.06,
+        "strategyChangeNeeded": 0.82
+      },
+      "score": 0.9205,
+      "strategyFamilies": [
+        "set port=3001 && npm start",
+        "set port=3002 && npm start",
+        "set port=3003 && npm start",
+        "set port=3004 && npm start"
+      ]
+    },
+    {
+      "caseId": "loop-config-02",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 295,
+      "scores": {
+        "sameStrategy": 0.62,
+        "newInformation": 0.23,
+        "likelyToProgress": 0.06,
+        "strategyChangeNeeded": 0.86
+      },
+      "strategyFamilies": [
+        "cp .env.example .env && npm start",
+        "npm start development",
+        "node_env=development npm start",
+        "npm start"
+      ]
+    },
+    {
+      "caseId": "loop-config-02",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 302,
+      "scores": {
+        "sameStrategy": 0.85,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.91,
+        "newInformation": 0.2,
+        "likelyToProgress": 0.09,
+        "strategyChangeNeeded": 0.65
+      },
+      "score": 0.861,
+      "strategyFamilies": [
+        "cp .env.example .env && npm start",
+        "npm start development",
+        "node_env=development npm start",
+        "npm start"
+      ]
+    },
+    {
+      "caseId": "loop-docker-01",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 293,
+      "scores": {
+        "sameStrategy": 0.94,
+        "newInformation": 0.23,
+        "likelyToProgress": 0.08,
+        "strategyChangeNeeded": 0.87
+      },
+      "strategyFamilies": [
+        "container-restart",
+        "container-restart",
+        "container-restart",
+        "container-restart"
+      ]
+    },
+    {
+      "caseId": "loop-docker-01",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 259,
+      "scores": {
+        "sameStrategy": 0.97,
+        "sameUnderlyingProblem": 0.97,
+        "surfaceVariation": 0.92,
+        "newInformation": 0.22,
+        "likelyToProgress": 0.1,
+        "strategyChangeNeeded": 0.82
+      },
+      "score": 0.9025,
+      "strategyFamilies": [
+        "container-restart",
+        "container-restart",
+        "container-restart",
+        "container-restart"
+      ]
+    },
+    {
+      "caseId": "loop-docker-02",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 375,
+      "scores": {
+        "sameStrategy": 0.92,
+        "newInformation": 0.16,
+        "likelyToProgress": 0.07,
+        "strategyChangeNeeded": 0.78
+      },
+      "strategyFamilies": [
+        "build-validation",
+        "build-validation",
+        "build-validation",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "loop-docker-02",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 327,
+      "scores": {
+        "sameStrategy": 0.95,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.9,
+        "newInformation": 0.18,
+        "likelyToProgress": 0.09,
+        "strategyChangeNeeded": 0.42
+      },
+      "score": 0.8655,
+      "strategyFamilies": [
+        "build-validation",
+        "build-validation",
+        "build-validation",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "loop-test-01",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 304,
+      "scores": {
+        "sameStrategy": 0.96,
+        "newInformation": 0.16,
+        "likelyToProgress": 0.09,
+        "strategyChangeNeeded": 0.8
+      },
+      "strategyFamilies": [
+        "test-validation",
+        "test-validation",
+        "test-validation",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "loop-test-01",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 269,
+      "scores": {
+        "sameStrategy": 0.98,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.94,
+        "newInformation": 0.12,
+        "likelyToProgress": 0.11,
+        "strategyChangeNeeded": 0.67
+      },
+      "score": 0.9139999999999999,
+      "strategyFamilies": [
+        "test-validation",
+        "test-validation",
+        "test-validation",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "loop-test-02",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 283,
+      "scores": {
+        "sameStrategy": 0.95,
+        "newInformation": 0.14,
+        "likelyToProgress": 0.09,
+        "strategyChangeNeeded": 0.74
+      },
+      "strategyFamilies": [
+        "test-validation",
+        "test-validation",
+        "test-validation",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "loop-test-02",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 265,
+      "scores": {
+        "sameStrategy": 0.97,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.94,
+        "newInformation": 0.12,
+        "likelyToProgress": 0.11,
+        "strategyChangeNeeded": 0.5
+      },
+      "score": 0.8945000000000001,
+      "strategyFamilies": [
+        "test-validation",
+        "test-validation",
+        "test-validation",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "loop-type-01",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 458,
+      "scores": {
+        "sameStrategy": 0.79,
+        "newInformation": 0.2,
+        "likelyToProgress": 0.08,
+        "strategyChangeNeeded": 0.86
+      },
+      "strategyFamilies": [
+        "cast value as any && pnpm typecheck",
+        "cast value as unknown as user && pnpm typecheck",
+        "cast value as any && pnpm typecheck",
+        "pnpm typecheck"
+      ]
+    },
+    {
+      "caseId": "loop-type-01",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 278,
+      "scores": {
+        "sameStrategy": 0.9,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.94,
+        "newInformation": 0.17,
+        "likelyToProgress": 0.11,
+        "strategyChangeNeeded": 0.84
+      },
+      "score": 0.901,
+      "strategyFamilies": [
+        "cast value as any && pnpm typecheck",
+        "cast value as unknown as user && pnpm typecheck",
+        "cast value as any && pnpm typecheck",
+        "pnpm typecheck"
+      ]
+    },
+    {
+      "caseId": "loop-type-02",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 277,
+      "scores": {
+        "sameStrategy": 0.76,
+        "newInformation": 0.14,
+        "likelyToProgress": 0.09,
+        "strategyChangeNeeded": 0.8
+      },
+      "strategyFamilies": [
+        "pnpm typecheck",
+        "pnpm typecheck false",
+        "pnpm typecheck",
+        "pnpm typecheck false"
+      ]
+    },
+    {
+      "caseId": "loop-type-02",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 284,
+      "scores": {
+        "sameStrategy": 0.95,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.94,
+        "newInformation": 0.13,
+        "likelyToProgress": 0.1,
+        "strategyChangeNeeded": 0.65
+      },
+      "score": 0.9035,
+      "strategyFamilies": [
+        "pnpm typecheck",
+        "pnpm typecheck false",
+        "pnpm typecheck",
+        "pnpm typecheck false"
+      ]
+    },
+    {
+      "caseId": "loop-cache-01",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 318,
+      "scores": {
+        "sameStrategy": 0.92,
+        "newInformation": 0.14,
+        "likelyToProgress": 0.06,
+        "strategyChangeNeeded": 0.85
+      },
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "loop-cache-01",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 266,
+      "scores": {
+        "sameStrategy": 0.96,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.94,
+        "newInformation": 0.15,
+        "likelyToProgress": 0.07,
+        "strategyChangeNeeded": 0.79
+      },
+      "score": 0.919,
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "loop-cache-02",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 266,
+      "scores": {
+        "sameStrategy": 0.91,
+        "newInformation": 0.22,
+        "likelyToProgress": 0.06,
+        "strategyChangeNeeded": 0.87
+      },
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "loop-cache-02",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 266,
+      "scores": {
+        "sameStrategy": 0.94,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.93,
+        "newInformation": 0.22,
+        "likelyToProgress": 0.07,
+        "strategyChangeNeeded": 0.81
+      },
+      "score": 0.9005000000000001,
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "loop-retry-01",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 260,
+      "scores": {
+        "sameStrategy": 0.86,
+        "newInformation": 0.18,
+        "likelyToProgress": 0.07,
+        "strategyChangeNeeded": 0.81
+      },
+      "strategyFamilies": [
+        "pnpm migrate",
+        "pnpm migrate",
+        "pnpm migrate",
+        "pnpm migrate"
+      ]
+    },
+    {
+      "caseId": "loop-retry-01",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 248,
+      "scores": {
+        "sameStrategy": 0.95,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.91,
+        "newInformation": 0.19,
+        "likelyToProgress": 0.08,
+        "strategyChangeNeeded": 0.56
+      },
+      "score": 0.8800000000000001,
+      "strategyFamilies": [
+        "pnpm migrate",
+        "pnpm migrate",
+        "pnpm migrate",
+        "pnpm migrate"
+      ]
+    },
+    {
+      "caseId": "loop-retry-02",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 240,
+      "scores": {
+        "sameStrategy": 0.95,
+        "newInformation": 0.14,
+        "likelyToProgress": 0.05,
+        "strategyChangeNeeded": 0.88
+      },
+      "strategyFamilies": [
+        "pnpm deploy",
+        "pnpm deploy",
+        "pnpm deploy",
+        "pnpm deploy"
+      ]
+    },
+    {
+      "caseId": "loop-retry-02",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 239,
+      "scores": {
+        "sameStrategy": 0.97,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.93,
+        "newInformation": 0.17,
+        "likelyToProgress": 0.05,
+        "strategyChangeNeeded": 0.8
+      },
+      "score": 0.919,
+      "strategyFamilies": [
+        "pnpm deploy",
+        "pnpm deploy",
+        "pnpm deploy",
+        "pnpm deploy"
+      ]
+    },
+    {
+      "caseId": "loop-port-01",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 256,
+      "scores": {
+        "sameStrategy": 0.84,
+        "newInformation": 0.21,
+        "likelyToProgress": 0.05,
+        "strategyChangeNeeded": 0.88
+      },
+      "strategyFamilies": [
+        "port=3001 pnpm dev",
+        "port=3002 pnpm dev",
+        "port=3003 pnpm dev",
+        "port=3004 pnpm dev"
+      ]
+    },
+    {
+      "caseId": "loop-port-01",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 249,
+      "scores": {
+        "sameStrategy": 0.97,
+        "sameUnderlyingProblem": 0.98,
+        "surfaceVariation": 0.95,
+        "newInformation": 0.2,
+        "likelyToProgress": 0.07,
+        "strategyChangeNeeded": 0.46
+      },
+      "score": 0.88,
+      "strategyFamilies": [
+        "port=3001 pnpm dev",
+        "port=3002 pnpm dev",
+        "port=3003 pnpm dev",
+        "port=3004 pnpm dev"
+      ]
+    },
+    {
+      "caseId": "loop-port-02",
+      "label": "loop",
+      "variant": "v1",
+      "latencyMs": 338,
+      "scores": {
+        "sameStrategy": 0.86,
+        "newInformation": 0.22,
+        "likelyToProgress": 0.05,
+        "strategyChangeNeeded": 0.81
+      },
+      "strategyFamilies": [
+        "pnpm dev 3001",
+        "pnpm dev 3002",
+        "pnpm dev 3003",
+        "pnpm dev 3004"
+      ]
+    },
+    {
+      "caseId": "loop-port-02",
+      "label": "loop",
+      "variant": "v2",
+      "latencyMs": 261,
+      "scores": {
+        "sameStrategy": 0.96,
+        "sameUnderlyingProblem": 0.97,
+        "surfaceVariation": 0.94,
+        "newInformation": 0.26,
+        "likelyToProgress": 0.07,
+        "strategyChangeNeeded": 0.52
+      },
+      "score": 0.868,
+      "strategyFamilies": [
+        "pnpm dev 3001",
+        "pnpm dev 3002",
+        "pnpm dev 3003",
+        "pnpm dev 3004"
+      ]
+    },
+    {
+      "caseId": "progress-debug-01",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 236,
+      "scores": {
+        "sameStrategy": 0.5,
+        "newInformation": 0.82,
+        "likelyToProgress": 0.38,
+        "strategyChangeNeeded": 0.15
+      },
+      "strategyFamilies": [
+        "test-validation",
+        "diagnosis",
+        "edit src/user.ts",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "progress-debug-01",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 401,
+      "scores": {
+        "sameStrategy": 0.37,
+        "sameUnderlyingProblem": 0.11,
+        "surfaceVariation": 0.18,
+        "newInformation": 0.77,
+        "likelyToProgress": 0.59,
+        "strategyChangeNeeded": 0.16
+      },
+      "score": 0.2445,
+      "strategyFamilies": [
+        "test-validation",
+        "diagnosis",
+        "edit src/user.ts",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "progress-debug-02",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 319,
+      "scores": {
+        "sameStrategy": 0.53,
+        "newInformation": 0.82,
+        "likelyToProgress": 0.38,
+        "strategyChangeNeeded": 0.15
+      },
+      "strategyFamilies": [
+        "test-validation",
+        "diagnosis",
+        "edit auth.py",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "progress-debug-02",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 267,
+      "scores": {
+        "sameStrategy": 0.41,
+        "sameUnderlyingProblem": 0.12,
+        "surfaceVariation": 0.24,
+        "newInformation": 0.78,
+        "likelyToProgress": 0.62,
+        "strategyChangeNeeded": 0.17
+      },
+      "score": 0.2615,
+      "strategyFamilies": [
+        "test-validation",
+        "diagnosis",
+        "edit auth.py",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "progress-search-01",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 270,
+      "scores": {
+        "sameStrategy": 0.72,
+        "newInformation": 0.79,
+        "likelyToProgress": 0.31,
+        "strategyChangeNeeded": 0.58
+      },
+      "strategyFamilies": [
+        "diagnosis",
+        "diagnosis",
+        "diagnosis",
+        "diagnosis"
+      ]
+    },
+    {
+      "caseId": "progress-search-01",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 340,
+      "scores": {
+        "sameStrategy": 0.88,
+        "sameUnderlyingProblem": 0.75,
+        "surfaceVariation": 0.59,
+        "newInformation": 0.75,
+        "likelyToProgress": 0.56,
+        "strategyChangeNeeded": 0.51
+      },
+      "score": 0.6035000000000001,
+      "strategyFamilies": [
+        "diagnosis",
+        "diagnosis",
+        "diagnosis",
+        "diagnosis"
+      ]
+    },
+    {
+      "caseId": "progress-search-02",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 322,
+      "scores": {
+        "sameStrategy": 0.78,
+        "newInformation": 0.58,
+        "likelyToProgress": 0.25,
+        "strategyChangeNeeded": 0.64
+      },
+      "strategyFamilies": [
+        "diagnosis",
+        "diagnosis",
+        "diagnosis",
+        "diagnosis"
+      ]
+    },
+    {
+      "caseId": "progress-search-02",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 280,
+      "scores": {
+        "sameStrategy": 0.88,
+        "sameUnderlyingProblem": 0.88,
+        "surfaceVariation": 0.76,
+        "newInformation": 0.52,
+        "likelyToProgress": 0.39,
+        "strategyChangeNeeded": 0.58
+      },
+      "score": 0.7250000000000001,
+      "strategyFamilies": [
+        "diagnosis",
+        "diagnosis",
+        "diagnosis",
+        "diagnosis"
+      ]
+    },
+    {
+      "caseId": "progress-dependency-01",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 327,
+      "scores": {
+        "sameStrategy": 0.6,
+        "newInformation": 0.72,
+        "likelyToProgress": 0.43,
+        "strategyChangeNeeded": 0.32
+      },
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "dependency-diagnosis",
+        "dependency-diagnosis",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "progress-dependency-01",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 285,
+      "scores": {
+        "sameStrategy": 0.6,
+        "sameUnderlyingProblem": 0.42,
+        "surfaceVariation": 0.52,
+        "newInformation": 0.71,
+        "likelyToProgress": 0.57,
+        "strategyChangeNeeded": 0.33
+      },
+      "score": 0.44600000000000006,
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "dependency-diagnosis",
+        "dependency-diagnosis",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "progress-dependency-02",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 246,
+      "scores": {
+        "sameStrategy": 0.52,
+        "newInformation": 0.82,
+        "likelyToProgress": 0.57,
+        "strategyChangeNeeded": 0.19
+      },
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "npm config get registry",
+        "diagnosis",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "progress-dependency-02",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 246,
+      "scores": {
+        "sameStrategy": 0.46,
+        "sameUnderlyingProblem": 0.14,
+        "surfaceVariation": 0.41,
+        "newInformation": 0.76,
+        "likelyToProgress": 0.67,
+        "strategyChangeNeeded": 0.22
+      },
+      "score": 0.3075,
+      "strategyFamilies": [
+        "dependency-reinstall",
+        "npm config get registry",
+        "diagnosis",
+        "dependency-reinstall"
+      ]
+    },
+    {
+      "caseId": "progress-build-01",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 267,
+      "scores": {
+        "sameStrategy": 0.58,
+        "newInformation": 0.79,
+        "likelyToProgress": 0.45,
+        "strategyChangeNeeded": 0.16
+      },
+      "strategyFamilies": [
+        "build-validation",
+        "diagnosis",
+        "edit src/api.ts",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "progress-build-01",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 284,
+      "scores": {
+        "sameStrategy": 0.38,
+        "sameUnderlyingProblem": 0.2,
+        "surfaceVariation": 0.28,
+        "newInformation": 0.73,
+        "likelyToProgress": 0.65,
+        "strategyChangeNeeded": 0.2
+      },
+      "score": 0.28600000000000003,
+      "strategyFamilies": [
+        "build-validation",
+        "diagnosis",
+        "edit src/api.ts",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "progress-build-02",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 254,
+      "scores": {
+        "sameStrategy": 0.48,
+        "newInformation": 0.75,
+        "likelyToProgress": 0.43,
+        "strategyChangeNeeded": 0.19
+      },
+      "strategyFamilies": [
+        "build-validation",
+        "diagnosis",
+        "edit src/hooks.ts",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "progress-build-02",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 330,
+      "scores": {
+        "sameStrategy": 0.42,
+        "sameUnderlyingProblem": 0.24,
+        "surfaceVariation": 0.26,
+        "newInformation": 0.67,
+        "likelyToProgress": 0.6,
+        "strategyChangeNeeded": 0.19
+      },
+      "score": 0.31700000000000006,
+      "strategyFamilies": [
+        "build-validation",
+        "diagnosis",
+        "edit src/hooks.ts",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "progress-compiler-01",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 281,
+      "scores": {
+        "sameStrategy": 0.55,
+        "newInformation": 0.7,
+        "likelyToProgress": 0.34,
+        "strategyChangeNeeded": 0.41
+      },
+      "strategyFamilies": [
+        "pnpm typecheck",
+        "edit src/user.ts",
+        "pnpm typecheck",
+        "edit src/order.ts"
+      ]
+    },
+    {
+      "caseId": "progress-compiler-01",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 452,
+      "scores": {
+        "sameStrategy": 0.7,
+        "sameUnderlyingProblem": 0.57,
+        "surfaceVariation": 0.37,
+        "newInformation": 0.68,
+        "likelyToProgress": 0.54,
+        "strategyChangeNeeded": 0.4
+      },
+      "score": 0.49449999999999994,
+      "strategyFamilies": [
+        "pnpm typecheck",
+        "edit src/user.ts",
+        "pnpm typecheck",
+        "edit src/order.ts"
+      ]
+    },
+    {
+      "caseId": "progress-compiler-02",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 293,
+      "scores": {
+        "sameStrategy": 0.65,
+        "newInformation": 0.64,
+        "likelyToProgress": 0.33,
+        "strategyChangeNeeded": 0.42
+      },
+      "strategyFamilies": [
+        "pnpm typecheck",
+        "edit src/a.ts",
+        "pnpm typecheck",
+        "edit src/b.ts"
+      ]
+    },
+    {
+      "caseId": "progress-compiler-02",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 243,
+      "scores": {
+        "sameStrategy": 0.75,
+        "sameUnderlyingProblem": 0.67,
+        "surfaceVariation": 0.53,
+        "newInformation": 0.59,
+        "likelyToProgress": 0.47,
+        "strategyChangeNeeded": 0.41
+      },
+      "score": 0.5770000000000001,
+      "strategyFamilies": [
+        "pnpm typecheck",
+        "edit src/a.ts",
+        "pnpm typecheck",
+        "edit src/b.ts"
+      ]
+    },
+    {
+      "caseId": "progress-config-01",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 270,
+      "scores": {
+        "sameStrategy": 0.52,
+        "newInformation": 0.85,
+        "likelyToProgress": 0.56,
+        "strategyChangeNeeded": 0.16
+      },
+      "strategyFamilies": [
+        "pnpm start",
+        "diagnosis",
+        "write .env",
+        "pnpm start"
+      ]
+    },
+    {
+      "caseId": "progress-config-01",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 305,
+      "scores": {
+        "sameStrategy": 0.32,
+        "sameUnderlyingProblem": 0.18,
+        "surfaceVariation": 0.27,
+        "newInformation": 0.78,
+        "likelyToProgress": 0.78,
+        "strategyChangeNeeded": 0.18
+      },
+      "score": 0.2405,
+      "strategyFamilies": [
+        "pnpm start",
+        "diagnosis",
+        "write .env",
+        "pnpm start"
+      ]
+    },
+    {
+      "caseId": "progress-config-02",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 249,
+      "scores": {
+        "sameStrategy": 0.6,
+        "newInformation": 0.84,
+        "likelyToProgress": 0.54,
+        "strategyChangeNeeded": 0.16
+      },
+      "strategyFamilies": [
+        "pnpm start",
+        "diagnosis",
+        "edit config.ts",
+        "pnpm start"
+      ]
+    },
+    {
+      "caseId": "progress-config-02",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 418,
+      "scores": {
+        "sameStrategy": 0.33,
+        "sameUnderlyingProblem": 0.21,
+        "surfaceVariation": 0.25,
+        "newInformation": 0.78,
+        "likelyToProgress": 0.68,
+        "strategyChangeNeeded": 0.18
+      },
+      "score": 0.256,
+      "strategyFamilies": [
+        "pnpm start",
+        "diagnosis",
+        "edit config.ts",
+        "pnpm start"
+      ]
+    },
+    {
+      "caseId": "progress-docker-01",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 283,
+      "scores": {
+        "sameStrategy": 0.59,
+        "newInformation": 0.79,
+        "likelyToProgress": 0.52,
+        "strategyChangeNeeded": 0.17
+      },
+      "strategyFamilies": [
+        "container-restart",
+        "docker compose logs postgres",
+        "edit compose.yaml",
+        "container-restart"
+      ]
+    },
+    {
+      "caseId": "progress-docker-01",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 327,
+      "scores": {
+        "sameStrategy": 0.47,
+        "sameUnderlyingProblem": 0.14,
+        "surfaceVariation": 0.36,
+        "newInformation": 0.74,
+        "likelyToProgress": 0.65,
+        "strategyChangeNeeded": 0.23
+      },
+      "score": 0.3095,
+      "strategyFamilies": [
+        "container-restart",
+        "docker compose logs postgres",
+        "edit compose.yaml",
+        "container-restart"
+      ]
+    },
+    {
+      "caseId": "progress-docker-02",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 298,
+      "scores": {
+        "sameStrategy": 0.42,
+        "newInformation": 0.83,
+        "likelyToProgress": 0.49,
+        "strategyChangeNeeded": 0.21
+      },
+      "strategyFamilies": [
+        "build-validation",
+        "diagnosis",
+        "edit dockerfile",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "progress-docker-02",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 240,
+      "scores": {
+        "sameStrategy": 0.35,
+        "sameUnderlyingProblem": 0.1,
+        "surfaceVariation": 0.27,
+        "newInformation": 0.79,
+        "likelyToProgress": 0.74,
+        "strategyChangeNeeded": 0.25
+      },
+      "score": 0.241,
+      "strategyFamilies": [
+        "build-validation",
+        "diagnosis",
+        "edit dockerfile",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "progress-permission-01",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 282,
+      "scores": {
+        "sameStrategy": 0.43,
+        "newInformation": 0.84,
+        "likelyToProgress": 0.66,
+        "strategyChangeNeeded": 0.17
+      },
+      "strategyFamilies": [
+        "build-validation",
+        "diagnosis",
+        "edit docker-compose.yaml",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "progress-permission-01",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 281,
+      "scores": {
+        "sameStrategy": 0.4,
+        "sameUnderlyingProblem": 0.1,
+        "surfaceVariation": 0.21,
+        "newInformation": 0.79,
+        "likelyToProgress": 0.85,
+        "strategyChangeNeeded": 0.18
+      },
+      "score": 0.2265,
+      "strategyFamilies": [
+        "build-validation",
+        "diagnosis",
+        "edit docker-compose.yaml",
+        "build-validation"
+      ]
+    },
+    {
+      "caseId": "progress-permission-02",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 279,
+      "scores": {
+        "sameStrategy": 0.64,
+        "newInformation": 0.76,
+        "likelyToProgress": 0.58,
+        "strategyChangeNeeded": 0.18
+      },
+      "strategyFamilies": [
+        "./run.sh",
+        "ls -l run.sh",
+        "permission-change",
+        "./run.sh"
+      ]
+    },
+    {
+      "caseId": "progress-permission-02",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 240,
+      "scores": {
+        "sameStrategy": 0.58,
+        "sameUnderlyingProblem": 0.16,
+        "surfaceVariation": 0.53,
+        "newInformation": 0.68,
+        "likelyToProgress": 0.73,
+        "strategyChangeNeeded": 0.19
+      },
+      "score": 0.36650000000000005,
+      "strategyFamilies": [
+        "./run.sh",
+        "ls -l run.sh",
+        "permission-change",
+        "./run.sh"
+      ]
+    },
+    {
+      "caseId": "progress-test-01",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 239,
+      "scores": {
+        "sameStrategy": 0.57,
+        "newInformation": 0.83,
+        "likelyToProgress": 0.41,
+        "strategyChangeNeeded": 0.19
+      },
+      "strategyFamilies": [
+        "test-validation",
+        "test-validation",
+        "edit cart.ts",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "progress-test-01",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 256,
+      "scores": {
+        "sameStrategy": 0.66,
+        "sameUnderlyingProblem": 0.13,
+        "surfaceVariation": 0.24,
+        "newInformation": 0.77,
+        "likelyToProgress": 0.58,
+        "strategyChangeNeeded": 0.22
+      },
+      "score": 0.3370000000000001,
+      "strategyFamilies": [
+        "test-validation",
+        "test-validation",
+        "edit cart.ts",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "progress-test-02",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 603,
+      "scores": {
+        "sameStrategy": 0.48,
+        "newInformation": 0.75,
+        "likelyToProgress": 0.38,
+        "strategyChangeNeeded": 0.23
+      },
+      "strategyFamilies": [
+        "test-validation",
+        "diagnosis",
+        "edit order.py",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "progress-test-02",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 247,
+      "scores": {
+        "sameStrategy": 0.48,
+        "sameUnderlyingProblem": 0.28,
+        "surfaceVariation": 0.5,
+        "newInformation": 0.74,
+        "likelyToProgress": 0.54,
+        "strategyChangeNeeded": 0.22
+      },
+      "score": 0.371,
+      "strategyFamilies": [
+        "test-validation",
+        "diagnosis",
+        "edit order.py",
+        "test-validation"
+      ]
+    },
+    {
+      "caseId": "progress-port-01",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 504,
+      "scores": {
+        "sameStrategy": 0.6,
+        "newInformation": 0.78,
+        "likelyToProgress": 0.65,
+        "strategyChangeNeeded": 0.11
+      },
+      "strategyFamilies": [
+        "pnpm dev",
+        "lsof -i :3000",
+        "kill old-dev-process",
+        "pnpm dev"
+      ]
+    },
+    {
+      "caseId": "progress-port-01",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 278,
+      "scores": {
+        "sameStrategy": 0.57,
+        "sameUnderlyingProblem": 0.09,
+        "surfaceVariation": 0.28,
+        "newInformation": 0.67,
+        "likelyToProgress": 0.81,
+        "strategyChangeNeeded": 0.12
+      },
+      "score": 0.2995,
+      "strategyFamilies": [
+        "pnpm dev",
+        "lsof -i :3000",
+        "kill old-dev-process",
+        "pnpm dev"
+      ]
+    },
+    {
+      "caseId": "progress-port-02",
+      "label": "progress",
+      "variant": "v1",
+      "latencyMs": 283,
+      "scores": {
+        "sameStrategy": 0.43,
+        "newInformation": 0.84,
+        "likelyToProgress": 0.58,
+        "strategyChangeNeeded": 0.17
+      },
+      "strategyFamilies": [
+        "pnpm dev",
+        "diagnosis",
+        "write .env",
+        "pnpm dev"
+      ]
+    },
+    {
+      "caseId": "progress-port-02",
+      "label": "progress",
+      "variant": "v2",
+      "latencyMs": 308,
+      "scores": {
+        "sameStrategy": 0.33,
+        "sameUnderlyingProblem": 0.15,
+        "surfaceVariation": 0.29,
+        "newInformation": 0.79,
+        "likelyToProgress": 0.81,
+        "strategyChangeNeeded": 0.18
+      },
+      "score": 0.235,
+      "strategyFamilies": [
+        "pnpm dev",
+        "diagnosis",
+        "write .env",
+        "pnpm dev"
+      ]
+    }
+  ]
+}

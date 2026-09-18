@@ -1,0 +1,22 @@
+[
+  { "id": "package-loop-01", "category": "stagnation", "label": "loop", "family": "package" },
+  { "id": "package-loop-02", "category": "stagnation", "label": "loop", "family": "package" },
+  { "id": "test-loop-01", "category": "stagnation", "label": "loop", "family": "test" },
+  { "id": "test-loop-02", "category": "stagnation", "label": "loop", "family": "test" },
+  { "id": "type-loop-01", "category": "stagnation", "label": "loop", "family": "type" },
+  { "id": "type-loop-02", "category": "stagnation", "label": "loop", "family": "type" },
+  { "id": "config-loop-01", "category": "stagnation", "label": "loop", "family": "config" },
+  { "id": "config-loop-02", "category": "stagnation", "label": "loop", "family": "config" },
+  { "id": "build-loop-01", "category": "stagnation", "label": "loop", "family": "build" },
+  { "id": "build-loop-02", "category": "stagnation", "label": "loop", "family": "build" },
+  { "id": "progress-01", "category": "stagnation", "label": "progress", "family": "debug" },
+  { "id": "progress-02", "category": "stagnation", "label": "progress", "family": "test" },
+  { "id": "progress-03", "category": "stagnation", "label": "progress", "family": "build" },
+  { "id": "progress-04", "category": "stagnation", "label": "progress", "family": "config" },
+  { "id": "ambiguous-01", "category": "stagnation", "label": "ambiguous", "family": "package" },
+  { "id": "ambiguous-02", "category": "stagnation", "label": "ambiguous", "family": "test" },
+  { "id": "safe-action-01", "category": "risk", "label": "safe", "family": "read" },
+  { "id": "ambiguous-risk-01", "category": "risk", "label": "ambiguous", "family": "service" },
+  { "id": "incomplete-01", "category": "completion", "label": "incomplete", "family": "untested" },
+  { "id": "complete-01", "category": "completion", "label": "complete", "family": "validated" }
+]

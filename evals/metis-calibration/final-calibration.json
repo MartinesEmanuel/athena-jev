@@ -1,0 +1,29 @@
+{
+  "timestamp": "2026-09-18T05:29:00.470Z",
+  "provider": "typesafe",
+  "cases": 40,
+  "breakdown": {
+    "loops": 20,
+    "progress": 20,
+    "true_positive": 20,
+    "true_negative": 20,
+    "false_positive": 0,
+    "false_negative": 0,
+    "ambiguous": 0,
+    "not_applicable": 0,
+    "provider_error": 0,
+    "evaluation_error": 0
+  },
+  "recommended": {
+    "threshold": 0.8500000000000001,
+    "tp": 20,
+    "tn": 20,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1,
+    "recall": 1,
+    "specificity": 1,
+    "f1": 1
+  },
+  "policy": "composite score with low-new-information guard and four independent signals"
+}

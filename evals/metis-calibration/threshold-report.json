@@ -1,0 +1,126 @@
+{
+  "timestamp": "2026-09-18T05:29:00.470Z",
+  "rows": [
+    {
+      "threshold": 0.5,
+      "tp": 20,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "specificity": 1,
+      "f1": 1
+    },
+    {
+      "threshold": 0.55,
+      "tp": 20,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "specificity": 1,
+      "f1": 1
+    },
+    {
+      "threshold": 0.6,
+      "tp": 20,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "specificity": 1,
+      "f1": 1
+    },
+    {
+      "threshold": 0.65,
+      "tp": 20,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "specificity": 1,
+      "f1": 1
+    },
+    {
+      "threshold": 0.7,
+      "tp": 20,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "specificity": 1,
+      "f1": 1
+    },
+    {
+      "threshold": 0.75,
+      "tp": 20,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "specificity": 1,
+      "f1": 1
+    },
+    {
+      "threshold": 0.8,
+      "tp": 20,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "specificity": 1,
+      "f1": 1
+    },
+    {
+      "threshold": 0.8500000000000001,
+      "tp": 20,
+      "tn": 20,
+      "fp": 0,
+      "fn": 0,
+      "precision": 1,
+      "recall": 1,
+      "specificity": 1,
+      "f1": 1
+    },
+    {
+      "threshold": 0.9,
+      "tp": 11,
+      "tn": 20,
+      "fp": 0,
+      "fn": 9,
+      "precision": 1,
+      "recall": 0.55,
+      "specificity": 1,
+      "f1": 0.7096774193548387
+    },
+    {
+      "threshold": 0.95,
+      "tp": 0,
+      "tn": 20,
+      "fp": 0,
+      "fn": 20,
+      "precision": 0,
+      "recall": 0,
+      "specificity": 1,
+      "f1": 0
+    }
+  ],
+  "recommended": {
+    "threshold": 0.8500000000000001,
+    "tp": 20,
+    "tn": 20,
+    "fp": 0,
+    "fn": 0,
+    "precision": 1,
+    "recall": 1,
+    "specificity": 1,
+    "f1": 1
+  }
+}
