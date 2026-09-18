@@ -139,7 +139,7 @@ Run `pnpm eval:report` to render only measured JSON stored in `evals/results/`.
 
 ## Roadmap
 
-Supported adapters: OpenCode V1, OpenCode V2, and Codex CLI. Cursor is next phase. Claude Code is future roadmap.
+Supported adapters: OpenCode V1, OpenCode V2, Codex CLI, and Cursor. Claude Code is planned.
 
 ## Contributing
 

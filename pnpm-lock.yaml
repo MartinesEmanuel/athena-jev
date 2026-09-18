@@ -37,6 +37,9 @@ importers:
       '@athena/core':
         specifier: workspace:*
         version: link:../core
+      '@athena/cursor':
+        specifier: workspace:*
+        version: link:../cursor
       '@athena/typesafe':
         specifier: workspace:*
         version: link:../typesafe
@@ -58,6 +61,18 @@ importers:
       zod:
         specifier: ^3.24.0
         version: 3.25.76
+
+  packages/cursor:
+    dependencies:
+      '@athena/agent-sdk':
+        specifier: workspace:*
+        version: link:../agent-sdk
+      '@athena/core':
+        specifier: workspace:*
+        version: link:../core
+      '@athena/typesafe':
+        specifier: workspace:*
+        version: link:../typesafe
 
   packages/opencode:
     dependencies:

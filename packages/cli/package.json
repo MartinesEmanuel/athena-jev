@@ -3,5 +3,5 @@
   "bin": { "athena": "./dist/index.js" },
   "exports": { ".": { "types": "./dist/index.d.ts", "default": "./dist/index.js" } },
   "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json" },
-  "dependencies": { "@athena/codex": "workspace:*", "@athena/core": "workspace:*", "@athena/typesafe": "workspace:*" }
+  "dependencies": { "@athena/codex": "workspace:*", "@athena/core": "workspace:*", "@athena/cursor": "workspace:*", "@athena/typesafe": "workspace:*" }
 }
