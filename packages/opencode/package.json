@@ -27,6 +27,7 @@
     "@opencode/plugin": "2.0.7"
   },
   "devDependencies": {
+    "@opencode-ai/plugin-v1": "npm:@opencode-ai/plugin@1.18.31",
     "@opencode/theme": "^2.0.8",
     "@opentui/core": "^0.5.11",
     "@opentui/solid": "^0.5.11",

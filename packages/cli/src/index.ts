@@ -1,13 +1,17 @@
 #!/usr/bin/env node
 import { access, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
 import process from "node:process";
 import { EventStore, createSession, defaultConfig, decide, loadConfig, saveConfig, stateFor, type AthenaMode } from "@athena/core";
 import { DemoReflexProvider, TypeSafeReflexProvider } from "@athena/typesafe";
 
 const root = process.cwd();
+const run = promisify(execFile);
 const line = (text: string) => process.stdout.write(`${text}\n`);
-async function init() { const config = await loadConfig(root); await saveConfig(root, config); const plugin = join(root, ".opencode", "plugins", "athena.ts"); try { await access(plugin); line(`ATHENA initialized\nconfig     .athena/config.json\nplugin     exists: ${plugin}`); } catch { await mkdir(join(root, ".opencode", "plugins"), { recursive: true }); await writeFile(plugin, 'export { AthenaPlugin } from "@athena/opencode";\n'); line(`ATHENA initialized\nconfig     .athena/config.json\nplugin     ${plugin}`); } }
+async function openCodeVersion() { try { return (await run("opencode", ["--version"])).stdout.trim(); } catch { return undefined; } }
+async function init() { const config = await loadConfig(root); await saveConfig(root, config); const version = await openCodeVersion(); const plugin = join(root, ".opencode", "plugins", "athena.ts"); try { await access(plugin); line(`ATHENA initialized\nconfig     .athena/config.json\nplugin     exists: ${plugin}\nadapter    ${version?.startsWith("1.") ? "opencode-v1" : "opencode-v2"}`); } catch { await mkdir(join(root, ".opencode", "plugins"), { recursive: true }); const source = version?.startsWith("1.") ? 'export { AthenaV1Plugin as AthenaPlugin } from "@athena/opencode";\n' : 'export { AthenaPlugin } from "@athena/opencode";\n'; await writeFile(plugin, source); line(`ATHENA initialized\nconfig     .athena/config.json\nplugin     ${plugin}\nadapter    ${version?.startsWith("1.") ? "opencode-v1" : "opencode-v2"}`); } }
 async function doctor(live = false) { const config = await loadConfig(root); const checks: Array<[string, boolean]> = [ [`Node ${process.versions.node}`, Number(process.versions.node.split(".")[0]) >= 20], ["configuration valid", true], ["OpenCode adapter installed", await exists(join(root, ".opencode", "plugins", "athena.ts"))], ["TYPESAFE_API_KEY found", Boolean(process.env.TYPESAFE_API_KEY) || config.provider === "demo"], ["event store writable", await writable()] ]; if (live) { if (!process.env.TYPESAFE_API_KEY) checks.push(["Jev live check", false]); else { const health = await new TypeSafeReflexProvider().health(); checks.push(["Jev reachable", health.reachable], ["response schema valid", health.schemaValid]); if (health.latencyMs !== undefined) line(`live reflex latency: ${health.latencyMs}ms`); } } line("ATHENA Doctor\n"); for (const [name, ok] of checks) line(`${ok ? "✓" : "✗"} ${name}`); line(checks.every(([, ok]) => ok) ? "\nATHENA is ready." : "\nSet TYPESAFE_API_KEY for real Jev, or set provider to demo for offline use."); }
 async function exists(path: string) { try { await access(path); return true; } catch { return false; } }
 async function writable() { try { await mkdir(join(root, ".athena"), { recursive: true }); await writeFile(join(root, ".athena", ".write-check"), "ok"); return true; } catch { return false; } }

@@ -1,2 +1,1 @@
-import { AthenaPlugin } from "../../../../../packages/opencode/dist/plugin.js";
-export default AthenaPlugin;
+export { AthenaV1Plugin as default } from "../../../../../packages/opencode/dist/v1.js";
