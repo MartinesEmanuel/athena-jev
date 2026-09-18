@@ -27,8 +27,25 @@ importers:
         specifier: ^3.0.0
         version: 3.2.7(@types/node@22.20.3)(yaml@2.9.1)
 
+  packages/agent-sdk: {}
+
   packages/cli:
     dependencies:
+      '@athena/codex':
+        specifier: workspace:*
+        version: link:../codex
+      '@athena/core':
+        specifier: workspace:*
+        version: link:../core
+      '@athena/typesafe':
+        specifier: workspace:*
+        version: link:../typesafe
+
+  packages/codex:
+    dependencies:
+      '@athena/agent-sdk':
+        specifier: workspace:*
+        version: link:../agent-sdk
       '@athena/core':
         specifier: workspace:*
         version: link:../core

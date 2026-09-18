@@ -8,7 +8,7 @@ LLMs are good at thinking.
 
 They're surprisingly bad at noticing when they're repeating themselves, when an action is a bad idea, and when task isn't actually finished.
 
-ATHENA adds a System One reflex layer to coding agents using TypeSafe Jev.
+ATHENA is a reflex runtime for coding agents. It adds a System One reflex layer using TypeSafe Jev.
 
 ```text
 LLM     deliberate reasoning
@@ -68,7 +68,7 @@ athena mode balanced
 athena demo
 ```
 
-`init` creates `.athena/config.json` and `.opencode/plugins/athena.ts`. OpenCode loads plugin through its supported V2 tool hooks.
+`init` creates `.athena/config.json` and `.opencode/plugins/athena.ts`. `athena init codex` merges native Codex hooks. Read [adapter support](docs/adapters.md).
 
 ## Reflexes
 
@@ -139,7 +139,7 @@ Run `pnpm eval:report` to render only measured JSON stored in `evals/results/`.
 
 ## Roadmap
 
-More agent adapters, measured evaluations, and calibration tooling. Current adapter: OpenCode only.
+Supported adapters: OpenCode V1, OpenCode V2, and Codex CLI. Cursor is next phase. Claude Code is future roadmap.
 
 ## Contributing
 
