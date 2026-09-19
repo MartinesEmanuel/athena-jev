@@ -76,6 +76,20 @@ export function redact(value, context) {
   return output;
 }
 export const promptHash = (prompt) => sha256(prompt);
+export function caseDefinitionFingerprint(caseDefinition) {
+  const canonical = JSON.stringify({
+    id: caseDefinition.id,
+    category: caseDefinition.category,
+    fixture: caseDefinition.fixture,
+    taskPrompt: caseDefinition.taskPrompt,
+    validator: caseDefinition.validator,
+    timeoutMs: caseDefinition.timeoutMs,
+    requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy,
+    requestedTools: caseDefinition.requestedTools,
+    dataset: caseDefinition.dataset,
+  }, Object.keys(caseDefinition).sort());
+  return sha256(canonical);
+}
 export const runKey = (pairId, arm) => `${pairId}:${arm}`;
 export const runId = (pairId, arm) => `${pairId}-${arm}`;
 export const orderedArms = (seed, replicate) =>
@@ -116,16 +130,23 @@ export function validateCase(value) {
     !categories.has(value.category) ||
     !datasets.has(value.dataset) ||
     typeof value.fixture !== "string" || !value.fixture ||
-    typeof value.taskPrompt !== "string" || !value.taskPrompt
+    typeof value.taskPrompt !== "string" || !value.taskPrompt ||
+    typeof value.title !== "string" || !value.title ||
+    typeof value.description !== "string" || !value.description ||
+    typeof value.expectedBehavior !== "string" || !value.expectedBehavior
   )
-    fail("case id, category, or dataset");
+    fail("case id, category, dataset, title, description, or expectedBehavior");
   if (
     !Number.isInteger(value.timeoutMs) ||
     value.timeoutMs < 1000 ||
     !Array.isArray(value.tags) ||
-    !Array.isArray(value.requestedTools)
+    !Array.isArray(value.requestedTools) ||
+    !["easy", "medium", "hard"].includes(value.difficulty) ||
+    !["offline", "allow", "deny"].includes(value.requestedNetworkPolicy) ||
+    !value.requestedTools.every((t) => typeof t === "string" && t) ||
+    !value.tags.every((t) => typeof t === "string" && t)
   )
-    fail("case timeout or arrays");
+    fail("case timeout, arrays, difficulty, networkPolicy, or tool items");
   if (
     !value.validator ||
     !["file-present", "command"].includes(value.validator.kind)
@@ -171,6 +192,7 @@ export function validateResult(value) {
     "modelConfig",
     "fixtureFingerprint",
     "taskPromptHash",
+    "caseDefinitionFingerprint",
     "timeoutMs",
     "requestedTools",
     "startedAt",
@@ -203,7 +225,8 @@ export function validateResult(value) {
     !/^[a-f0-9]{64}$/.test(value.productionArtifactFingerprint) ||
     !/^[a-f0-9]{64}$/.test(value.benchmarkHarnessFingerprint) ||
     !/^[a-f0-9]{64}$/.test(value.fixtureFingerprint) ||
-    !/^[a-f0-9]{64}$/.test(value.taskPromptHash)
+    !/^[a-f0-9]{64}$/.test(value.taskPromptHash) ||
+    !/^[a-f0-9]{64}$/.test(value.caseDefinitionFingerprint)
   )
     fail("result fingerprint");
   if (
@@ -222,9 +245,23 @@ export function validateResult(value) {
     typeof value.validator?.success !== "boolean" ||
     !Array.isArray(value.validator?.evidence) ||
     typeof value.athenaTelemetrySummary?.active !== "boolean" ||
-    typeof value.runtimeEvidence?.athenaAbsent !== "boolean"
+    typeof value.runtimeEvidence?.athenaAbsent !== "boolean" ||
+    typeof value.runtimeEvidence?.localAthenaPlugin !== "boolean" ||
+    typeof value.runtimeEvidence?.athenaEventsFile !== "boolean" ||
+    typeof value.runtimeEvidence?.hostAthenaEvidence !== "boolean" ||
+    !["observed", "unavailable"].includes(value.runtimeEvidence?.providerCallVisibility) ||
+    (value.runtimeEvidence?.providerCalls !== null && typeof value.runtimeEvidence?.providerCalls !== "number") ||
+    (value.runtimeEvidence?.providerFailures !== null && typeof value.runtimeEvidence?.providerFailures !== "number") ||
+    typeof value.environmentMetadata?.networkIsolationVerified !== "boolean" ||
+    typeof value.environmentMetadata?.toolsIsolationVerified !== "boolean" ||
+    !["offline", "allow", "deny"].includes(value.environmentMetadata?.requestedNetworkPolicy) ||
+    !Array.isArray(value.environmentMetadata?.requestedTools)
   )
-    fail("result metrics");
+    fail("result metrics or nested consistency");
+  if (value.requestedNetworkPolicy !== value.environmentMetadata?.requestedNetworkPolicy)
+    fail("result requestedNetworkPolicy mismatch with environmentMetadata");
+  if (JSON.stringify(value.requestedTools) !== JSON.stringify(value.environmentMetadata?.requestedTools))
+    fail("result requestedTools mismatch with environmentMetadata");
   return value;
 }
 export async function loadCase(caseId) {
@@ -805,7 +842,7 @@ export function completionDeclaration(records, validatorSuccess) {
     ? !validatorSuccess
     : false;
 }
-export function mergeTrace(hostRecords, athenaEvents) {
+export function mergeTrace(hostRecords, athenaEvents, context) {
   return [
     ...hostRecords,
     ...athenaEvents.map((event, order) => ({
@@ -813,7 +850,7 @@ export function mergeTrace(hostRecords, athenaEvents) {
       order,
       timestamp: normalizeTimestamp(event.timestamp) || Date.now(),
       type: "athena-event",
-      event: JSON.parse(redact(JSON.stringify(event))),
+      event: JSON.parse(redact(JSON.stringify(event), context)),
     })),
   ].sort(
     (left, right) =>
@@ -889,8 +926,8 @@ async function athenaTelemetry(path) {
           ]
         : null,
     },
-    jevCalls: providerCompleted.length ? providerCompleted.length : null,
-    jevFailures: providerFailures.length ? providerFailures.length : null,
+    jevCalls: providerCompleted.length > 0 || providerFailures.length > 0 ? providerCompleted.length : null,
+    jevFailures: providerCompleted.length > 0 || providerFailures.length > 0 ? providerFailures.length : null,
     jevLatencyMs: providerLatency.length
       ? {
           median: median(providerLatency),
@@ -924,6 +961,7 @@ export function validatePair(runs) {
     "caseId",
     "fixtureFingerprint",
     "taskPromptHash",
+    "caseDefinitionFingerprint",
     "model",
     "host",
     "hostVersion",
@@ -1034,7 +1072,7 @@ export function findExistingRun(runs, experimentId, pairId, arm) {
 export function resumeCompatibility(stored, current) {
   const fields = [
     "experimentId", "pairId", "arm", "caseId", "fixtureFingerprint",
-    "taskPromptHash", "host", "hostVersion", "model", "modelConfig",
+    "taskPromptHash", "caseDefinitionFingerprint", "host", "hostVersion", "model", "modelConfig",
     "timeoutMs", "requestedNetworkPolicy", "requestedTools",
     "athenaFrozenCommit", "productionArtifactFingerprint",
     "benchmarkHarnessFingerprint", "dataset", "category", "orderSeed", "order",
@@ -1064,6 +1102,26 @@ export function experimentManifest({ plan, benchmarkCommit, frozenProductionDiff
     runs: plan.pairs.flatMap((pair) => pair.runs.map((run) => ({ ...run, pairId: pair.pairId, caseId: pair.caseId }))),
   };
 }
+export function manifestCompatibility(prior, current) {
+  const conflicts = [];
+  if (prior.benchmarkHarnessFingerprint !== current.benchmarkHarnessFingerprint)
+    conflicts.push({ field: "benchmarkHarnessFingerprint", prior: prior.benchmarkHarnessFingerprint, current: current.benchmarkHarnessFingerprint });
+  if (prior.productionArtifactFingerprint !== current.productionArtifactFingerprint)
+    conflicts.push({ field: "productionArtifactFingerprint", prior: prior.productionArtifactFingerprint, current: current.productionArtifactFingerprint });
+  if (prior.athenaFrozenCommit !== current.athenaFrozenCommit)
+    conflicts.push({ field: "athenaFrozenCommit", prior: prior.athenaFrozenCommit, current: current.athenaFrozenCommit });
+  if (prior.model !== current.model)
+    conflicts.push({ field: "model", prior: prior.model, current: current.model });
+  if (JSON.stringify(prior.modelConfig) !== JSON.stringify(current.modelConfig))
+    conflicts.push({ field: "modelConfig", prior: prior.modelConfig, current: current.modelConfig });
+  if (prior.timeoutMs !== current.timeoutMs)
+    conflicts.push({ field: "timeoutMs", prior: prior.timeoutMs, current: current.timeoutMs });
+  if (prior.seed !== current.seed)
+    conflicts.push({ field: "seed", prior: prior.seed, current: current.seed });
+  if (JSON.stringify(prior.pairs) !== JSON.stringify(current.pairs))
+    conflicts.push({ field: "pairs", prior: prior.pairs?.length, current: current.pairs?.length });
+  return { compatible: conflicts.length === 0, conflicts };
+}
 export function updateManifestRunStatus(manifest, runId, status) {
   const run = manifest.runs.find((item) => item.runId === runId);
   if (!run) throw new BenchmarkInfrastructureError(`manifest run absent: ${runId}`);
@@ -1079,10 +1137,12 @@ export async function runPair({
   dryRun = false,
   preserve = false,
   experimentPlan,
+  confirmLive = false,
 }) {
+  if (!experimentPlan) throw new BenchmarkInfrastructureError("runPair requires pre-created experiment plan");
+  if (!dryRun && !confirmLive) throw new BenchmarkInfrastructureError("runPair requires confirmLive: true for live execution");
   const caseDefinition = await loadCase(caseId);
   const effectiveTimeout = timeoutMs ?? caseDefinition.timeoutMs;
-  if (!experimentPlan) throw new BenchmarkInfrastructureError("runPair requires pre-created experiment plan");
   const plan = experimentPlan;
   const pair = plan.pairs.find(
     (item) =>
@@ -1096,7 +1156,7 @@ export async function runPair({
   const benchmarkCommit = await git(["rev-parse", "HEAD"]);
   const source = join(fixtureRoot, caseDefinition.fixture);
   const fingerprint = await fingerprintFixture(source);
-  const version = await hostVersion();
+  const version = dryRun ? "unverified-dry-run" : await hostVersion();
   const resultRoot = join(benchRoot, "results", plan.experimentId);
   await mkdir(join(resultRoot, "runs"), { recursive: true });
   await mkdir(join(resultRoot, "raw"), { recursive: true });
@@ -1104,15 +1164,18 @@ export async function runPair({
   const prior = await readFile(manifestPath, "utf8")
     .then(JSON.parse)
     .catch(() => null);
-  const caseMetadata = [{ caseId, fixture: caseDefinition.fixture, fixtureFingerprint: fingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, requestedTools: caseDefinition.requestedTools, dataset: caseDefinition.dataset, category: caseDefinition.category }];
+  const caseMetadata = [{ caseId, fixture: caseDefinition.fixture, fixtureFingerprint: fingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), caseDefinitionFingerprint: caseDefinitionFingerprint(caseDefinition), requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, requestedTools: caseDefinition.requestedTools, dataset: caseDefinition.dataset, category: caseDefinition.category }];
   const manifest = prior ?? experimentManifest({ plan, benchmarkCommit, frozenProductionDifferences: differences, productionRuntime, benchmarkHarnessFingerprint: harnessFingerprint, cases: caseMetadata });
-  if (prior && (prior.benchmarkHarnessFingerprint !== harnessFingerprint || prior.productionArtifactFingerprint !== productionRuntime.productionArtifactFingerprint || JSON.stringify(prior.pairs) !== JSON.stringify(plan.pairs))) throw new BenchmarkInfrastructureError("resume incompatible: experiment manifest identity");
+  if (prior) {
+    const compatibility = manifestCompatibility(prior, { ...plan, benchmarkHarnessFingerprint: harnessFingerprint, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, athenaFrozenCommit: FROZEN_ATHENA_COMMIT });
+    if (!compatibility.compatible) throw new BenchmarkInfrastructureError(`resume incompatible: manifest drift: ${compatibility.conflicts.map((c) => c.field).join(", ")}`);
+  }
   if (!prior) await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const saveManifest = async () => writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const completed = [];
   for (const arm of pair.order) {
     const plannedRun = pair.runs.find((run) => run.arm === arm);
-    const runIdentity = { experimentId: plan.experimentId, pairId: pair.pairId, arm, caseId, fixtureFingerprint: fingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), host: "OpenCode", hostVersion: version, model, modelConfig: plan.modelConfig, timeoutMs: effectiveTimeout, requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, requestedTools: caseDefinition.requestedTools, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, benchmarkHarnessFingerprint: harnessFingerprint, dataset: caseDefinition.dataset, category: caseDefinition.category, orderSeed: seed, order: pair.order };
+    const runIdentity = { experimentId: plan.experimentId, pairId: pair.pairId, arm, caseId, fixtureFingerprint: fingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), caseDefinitionFingerprint: caseDefinitionFingerprint(caseDefinition), host: "OpenCode", hostVersion: version, model, modelConfig: plan.modelConfig, timeoutMs: effectiveTimeout, requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, requestedTools: caseDefinition.requestedTools, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, benchmarkHarnessFingerprint: harnessFingerprint, dataset: caseDefinition.dataset, category: caseDefinition.category, orderSeed: seed, order: pair.order };
     const existing = findExistingRun(await existingRuns(resultRoot), plan.experimentId, pair.pairId, arm);
     if (existing) {
       assertResumeCompatible(existing, runIdentity);
@@ -1156,12 +1219,15 @@ export async function runPair({
     const hostAthena = /athena|typesafe|jev/i.test(
       `${execution.stdout}\n${execution.stderr}`,
     );
+    const providerObserved = telemetry.jevCalls !== null || telemetry.jevFailures !== null;
     const runtimeEvidence = {
       localAthenaPlugin: localPlugin,
       athenaEventsFile: telemetry.active,
       hostAthenaEvidence: hostAthena,
-      providerCallVisibility: telemetry.active ? "observed" : "unavailable",
+      providerCallVisibility: providerObserved ? "observed" : "unavailable",
       providerCalls: telemetry.jevCalls,
+      providerFailures: telemetry.jevFailures,
+      providerLatencyMs: providerObserved ? telemetry.jevLatencyMs : null,
       athenaAbsent:
         arm === "control" &&
         !localPlugin &&
@@ -1178,7 +1244,7 @@ export async function runPair({
           validator: caseDefinition.validator,
           baselineFiles,
         });
-    const trace = mergeTrace(host, telemetry.rawEvents);
+    const trace = mergeTrace(host, telemetry.rawEvents, { workdirRoot: work });
     const actions = trace.filter((record) => record.type === "action");
     const hostData = hostMetrics(host);
     const durationMs = Date.now() - started;
@@ -1205,6 +1271,7 @@ export async function runPair({
       modelConfig: plan.modelConfig,
       fixtureFingerprint: runFingerprint,
       taskPromptHash: promptHash(caseDefinition.taskPrompt),
+      caseDefinitionFingerprint: caseDefinitionFingerprint(caseDefinition),
       timeoutMs: effectiveTimeout,
       requestedTools: caseDefinition.requestedTools,
       requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy,
@@ -1238,7 +1305,7 @@ export async function runPair({
         dangerousActionBlocked: null,
         ...hostData,
       },
-      validator: JSON.parse(redact(JSON.stringify(validator))),
+      validator: JSON.parse(redact(JSON.stringify(validator), { workdirRoot: work })),
       runtimeEvidence: {
         ...runtimeEvidence,
         productionRuntime: productionRuntime.provenance,

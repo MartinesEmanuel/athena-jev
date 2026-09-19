@@ -27,6 +27,7 @@
     "modelConfig",
     "fixtureFingerprint",
     "taskPromptHash",
+    "caseDefinitionFingerprint",
     "timeoutMs",
     "requestedTools",
     "startedAt",
@@ -53,6 +54,7 @@
       ]
     },
     "fixtureFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "caseDefinitionFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "productionArtifactFingerprint": {
       "type": "string",
       "pattern": "^[a-f0-9]{64}$"

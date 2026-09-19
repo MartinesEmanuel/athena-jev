@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, readFile, symlink, writeFile } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, symlink, writeFile, chmod, access } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -138,6 +138,7 @@ const result = (arm: "control" | "treatment", pairId = "fixture-r01") => ({
   modelConfig: { model: "openai/gpt-5.6-terra", seedControl: "unsupported" },
   fixtureFingerprint: "a".repeat(64),
   taskPromptHash: "b".repeat(64),
+  caseDefinitionFingerprint: "e".repeat(64),
   timeoutMs: 1000,
   requestedTools: ["read"],
   requestedNetworkPolicy: "offline",
@@ -165,6 +166,8 @@ const result = (arm: "control" | "treatment", pairId = "fixture-r01") => ({
     hostAthenaEvidence: false,
     providerCallVisibility: "unavailable",
     providerCalls: null,
+    providerFailures: null,
+    providerLatencyMs: null,
   },
   athenaTelemetrySummary: {
     active: arm === "treatment",
@@ -174,6 +177,9 @@ const result = (arm: "control" | "treatment", pairId = "fixture-r01") => ({
   },
   environmentMetadata: {
     requestedNetworkPolicy: "offline",
+    networkIsolationVerified: false,
+    requestedTools: ["read"],
+    toolsIsolationVerified: false,
     orderSeed: 1,
     order: ["control", "treatment"],
   },
@@ -740,5 +746,163 @@ describe("benchmark harness", () => {
         { ...result("control"), fixtureFingerprint: "b".repeat(64) },
       ).resumeCompatible,
     ).toBe(false);
+  });
+
+  it("malformed artifact sharing valid pairId cannot affect summary", () => {
+    const valid = [
+      result("control", "fixture-r01"),
+      result("treatment", "fixture-r01"),
+    ];
+    const malformed = {
+      ...result("control", "fixture-r01"),
+      metrics: undefined,
+    };
+    const analysis = analyzeRuns([...valid, malformed as unknown as ReturnType<typeof result>]);
+    expect(analysis.control.n).toBe(1);
+    expect(analysis.artifactValidationErrors).toHaveLength(1);
+    expect(analysis.control.successRate).toBe(1);
+  });
+
+  it("completely missing planned pair remains reported", () => {
+    const plan = {
+      pairs: [
+        { pairId: "fixture-r01", runs: [{ runId: "fixture-r01-control", arm: "control" }, { runId: "fixture-r01-treatment", arm: "treatment" }] },
+        { pairId: "fixture-r02", runs: [{ runId: "fixture-r02-control", arm: "control" }, { runId: "fixture-r02-treatment", arm: "treatment" }] },
+      ],
+    };
+    const runs = [result("control", "fixture-r01"), result("treatment", "fixture-r01")];
+    const analysis = analyzeRuns(runs, plan);
+    expect(analysis.plannedPairs).toBe(2);
+    expect(analysis.validPairs).toHaveLength(1);
+    expect(analysis.missingPairs).toHaveLength(1);
+    expect(analysis.missingPairs[0].pairId).toBe("fixture-r02");
+  });
+
+  it("validator definition change rejects resume", () => {
+    const stored = { ...result("control"), caseDefinitionFingerprint: "a".repeat(64) };
+    const current = { ...result("control"), caseDefinitionFingerprint: "b".repeat(64) };
+    expect(resumeCompatibility(stored, current).resumeCompatible).toBe(false);
+    expect(resumeCompatibility(stored, current).fields[0].field).toBe("caseDefinitionFingerprint");
+  });
+
+  it("manifest model drift rejects resume", async () => {
+    const prior = { model: "model-a", modelConfig: { model: "model-a" }, timeoutMs: 1000, seed: 1, pairs: [], benchmarkHarnessFingerprint: "a".repeat(64), productionArtifactFingerprint: "b".repeat(64), athenaFrozenCommit: FROZEN_ATHENA_COMMIT };
+    const current = { model: "model-b", modelConfig: { model: "model-b" }, timeoutMs: 1000, seed: 1, pairs: [], benchmarkHarnessFingerprint: "a".repeat(64), productionArtifactFingerprint: "b".repeat(64), athenaFrozenCommit: FROZEN_ATHENA_COMMIT };
+    // @ts-expect-error JavaScript benchmark runner has no declaration output.
+    const { manifestCompatibility } = await import("../runners/index.mjs");
+    const compat = manifestCompatibility(prior, current);
+    expect(compat.compatible).toBe(false);
+    expect(compat.conflicts.some((c: { field: string }) => c.field === "model")).toBe(true);
+  });
+
+  it("ATHENA event workdir is context-redacted", () => {
+    const ctx = { workdirRoot: "/tmp/not-athena-pattern/session-947" };
+    const event = { type: "ACTION_PROPOSED", metadata: { tool: "bash", args: { command: "test", workdir: "/tmp/not-athena-pattern/session-947/work" } } };
+    const redacted = redact(JSON.stringify(event), ctx);
+    expect(redacted).not.toContain("/tmp/not-athena-pattern/session-947");
+    expect(redacted).toContain("$WORKDIR");
+  });
+
+  it("validator output workdir is context-redacted", () => {
+    const ctx = { workdirRoot: "/tmp/not-athena-pattern/session-947" };
+    const validator = { success: true, evidence: [{ type: "command", output: "/tmp/not-athena-pattern/session-947/output.txt" }] };
+    const redacted = redact(JSON.stringify(validator), ctx);
+    expect(redacted).not.toContain("/tmp/not-athena-pattern/session-947");
+    expect(redacted).toContain("$WORKDIR");
+  });
+
+  it("observed provider zero failures is 0 not null", () => {
+    const runs = [
+      { ...result("control", "fixture-r01"), athenaTelemetrySummary: { active: false, replan: 0, reflexCompleted: 0, jevCalls: null, jevFailures: null } },
+      { ...result("treatment", "fixture-r01"), athenaTelemetrySummary: { active: true, replan: 0, reflexCompleted: 0, jevCalls: 4, jevFailures: 0 } },
+    ];
+    const analysis = analyzeRuns(runs);
+    expect(analysis.treatment.jevCalls).toBe(4);
+  });
+
+  it("unknown provider remains null", () => {
+    const runs = [
+      { ...result("control", "fixture-r01"), athenaTelemetrySummary: { active: false, replan: 0, reflexCompleted: 0, jevCalls: null, jevFailures: null } },
+      { ...result("treatment", "fixture-r01"), athenaTelemetrySummary: { active: true, replan: 0, reflexCompleted: 0, jevCalls: null, jevFailures: null } },
+    ];
+    const analysis = analyzeRuns(runs);
+    expect(analysis.treatment.jevCalls).toBeNull();
+  });
+
+  it("validator ignoring SIGTERM receives SIGKILL", async () => {
+    const tmpDir = await mkdtemp(join(tmpdir(), "bench-validator-test-"));
+    const scriptPath = join(tmpDir, "ignore-sigterm.mjs");
+    await writeFile(scriptPath, `process.on("SIGTERM", () => {}); setInterval(() => {}, 100);`);
+    // @ts-expect-error JavaScript benchmark validator has no declaration output.
+    const { validateRun } = await import("../validators/index.mjs");
+    const start = Date.now();
+    const valResult = await validateRun({ fixtureRoot: tmpDir, runRoot: tmpDir, validator: { kind: "command", command: ["node", scriptPath], expectedExit: 0 }, baselineFiles: new Map(), timeoutMs: 1000 });
+    const elapsed = Date.now() - start;
+    expect(elapsed).toBeLessThan(8000);
+    expect(valResult.evidence[0].signal).toBe("SIGKILL");
+  });
+
+  it("invalid CLI numeric values rejected", async () => {
+    const runCli = async (args: string[]) => {
+      try {
+        await exec("node", ["bench/runners/cli.mjs", "pair", "--case", "straightforward-fix", ...args], { cwd: process.cwd() });
+        return { success: true };
+      } catch (error: unknown) {
+        return { success: false, message: (error as Error).message };
+      }
+    };
+    expect((await runCli(["--replicates", "0"])).success).toBe(false);
+    expect((await runCli(["--replicates", "-1"])).success).toBe(false);
+    expect((await runCli(["--replicates", "abc"])).success).toBe(false);
+    expect((await runCli(["--timeout", "abc"])).success).toBe(false);
+    expect((await runCli(["--timeout", "0"])).success).toBe(false);
+    expect((await runCli(["--seed", "abc"])).success).toBe(false);
+  });
+
+  it("--confirm-live false cannot launch live execution", async () => {
+    try {
+      await exec("node", ["bench/runners/cli.mjs", "pair", "--case", "straightforward-fix", "--confirm-live", "false"], { cwd: process.cwd() });
+      throw new Error("should have failed");
+    } catch (error: unknown) {
+      expect((error as Error).message).toContain("Live benchmark requires --confirm-live");
+    }
+  });
+
+  it("programmatic runPair cannot bypass live confirmation", async () => {
+    // @ts-expect-error JavaScript benchmark runner has no declaration output.
+    const { runPair } = await import("../runners/index.mjs");
+    const plan = planExperiment({ caseDefinition: sampleCase, replicates: 1, seed: 1, model: "m", timeoutMs: 1000, experimentId: "test-gate" });
+    await expect(
+      runPair({ caseId: "fixture", replicate: 1, seed: 1, timeoutMs: 1000, model: "m", dryRun: false, experimentPlan: plan, confirmLive: false }),
+    ).rejects.toThrow("confirmLive");
+  });
+
+  it("dry-run never invokes the opencode executable (sentinel test)", async () => {
+    const sentinelDir = await mkdtemp(join(tmpdir(), "bench-sentinel-"));
+    const sentinelPath = join(sentinelDir, "opencode-sentinel");
+    const binDir = join(sentinelDir, "bin");
+    await mkdir(binDir, { recursive: true });
+    const fakeOpenCode = join(binDir, "opencode");
+    await writeFile(fakeOpenCode, `#!/bin/sh\ntouch "${sentinelPath}"\nexit 0\n`);
+    await chmod(fakeOpenCode, 0o755);
+    const originalPath = process.env.PATH;
+    try {
+      process.env.PATH = `${binDir}:${originalPath}`;
+      // @ts-expect-error JavaScript benchmark runner has no declaration output.
+      const { runPair } = await import("../runners/index.mjs");
+      // @ts-expect-error JavaScript benchmark runner has no declaration output.
+      const { loadCase } = await import("../runners/index.mjs");
+      const caseDefinition = await loadCase("controlled-semantic-loop");
+      const plan = planExperiment({ caseDefinition, replicates: 1, seed: 1, model: "m", timeoutMs: 1000, experimentId: "test-sentinel" });
+      const pairResult = await runPair({ caseId: "controlled-semantic-loop", replicate: 1, seed: 1, timeoutMs: 1000, model: "m", dryRun: true, experimentPlan: plan, confirmLive: false });
+      let sentinelExists = false;
+      try { await access(sentinelPath); sentinelExists = true; } catch { sentinelExists = false; }
+      expect(sentinelExists).toBe(false);
+      expect(pairResult.pairId).toBe("controlled-semantic-loop-r01");
+      expect(pairResult.runs).toHaveLength(2);
+      expect(pairResult.runs.every((r: { validator: { evidence: Array<{ type: string }> } }) => r.validator.evidence.some((e: { type: string }) => e.type === "dry-run"))).toBe(true);
+    } finally {
+      process.env.PATH = originalPath;
+    }
   });
 });
