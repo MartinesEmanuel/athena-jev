@@ -4,67 +4,130 @@
   "title": "ATHENA benchmark run result",
   "type": "object",
   "required": [
-    "schemaVersion",
-    "experimentId",
-    "pairId",
-    "runId",
-    "caseId",
-    "arm",
-    "status",
-    "benchmarkCommit",
-    "athenaFrozenCommit",
-    "productionArtifactFingerprint",
-    "productionRuntime",
-    "benchmarkHarnessFingerprint",
-    "requestedNetworkPolicy",
-    "dataset",
-    "category",
-    "orderSeed",
-    "order",
-    "host",
-    "hostVersion",
-    "model",
-    "modelConfig",
-    "fixtureFingerprint",
-    "taskPromptHash",
-    "caseDefinitionFingerprint",
-    "timeoutMs",
-    "requestedTools",
-    "startedAt",
-    "finishedAt",
-    "durationMs",
-    "termination",
-    "metrics",
-    "validator",
-    "runtimeEvidence",
-    "athenaTelemetrySummary",
+    "schemaVersion", "experimentId", "pairId", "runId", "caseId", "arm",
+    "status", "benchmarkCommit", "athenaFrozenCommit", "productionArtifactFingerprint",
+    "productionRuntime", "benchmarkHarnessFingerprint", "requestedNetworkPolicy",
+    "dataset", "category", "orderSeed", "order", "host", "hostVersion", "model",
+    "modelConfig", "fixtureFingerprint", "taskPromptHash", "caseDefinitionFingerprint",
+    "timeoutMs", "requestedTools", "startedAt", "finishedAt", "durationMs",
+    "termination", "metrics", "validator", "runtimeEvidence", "athenaTelemetrySummary",
     "environmentMetadata"
   ],
   "properties": {
-    "schemaVersion": { "const": "1.1" },
+    "schemaVersion": { "const": "1.2" },
     "arm": { "enum": ["control", "treatment"] },
-    "status": {
-      "enum": [
-        "pending",
-        "running",
-        "completed",
-        "failed",
-        "timeout",
-        "invalid"
-      ]
-    },
+    "status": { "enum": ["pending", "running", "completed", "failed", "timeout", "invalid"] },
     "fixtureFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "caseDefinitionFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-    "productionArtifactFingerprint": {
-      "type": "string",
-      "pattern": "^[a-f0-9]{64}$"
-    },
+    "productionArtifactFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "productionRuntime": { "type": "object" },
     "benchmarkHarnessFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
     "durationMs": { "type": "number", "minimum": 0 },
     "termination": { "type": "object" },
     "metrics": { "type": "object" },
     "validator": { "type": "object" },
-    "athenaTelemetrySummary": { "type": "object" }
+    "athenaTelemetrySummary": { "type": "object" },
+    "environmentMetadata": {
+      "type": "object",
+      "required": [
+        "requestedNetworkPolicy", "networkIsolationVerified", "requestedTools",
+        "toolsIsolationVerified", "orderSeed", "order",
+        "modelVisibleInputFingerprint", "modelVisibleEnvironment",
+        "toolIsolation", "networkIsolation", "stagnationDecisionAudit"
+      ],
+      "properties": {
+        "requestedNetworkPolicy": { "enum": ["offline", "allow", "deny"] },
+        "networkIsolationVerified": { "type": "boolean" },
+        "requestedTools": { "type": "array", "items": { "type": "string" } },
+        "toolsIsolationVerified": { "type": "boolean" },
+        "orderSeed": { "type": "integer" },
+        "order": { "type": "array" },
+        "modelVisibleInputFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "modelVisibleEnvironment": {
+          "type": "object",
+          "properties": {
+            "fingerprint": { "type": "string" },
+            "athenaArtifactsPresent": { "type": "boolean" },
+            "benchmarkArtifactsPresent": { "type": "boolean" },
+            "verifiedEquivalentInput": { "type": "boolean" }
+          }
+        },
+        "toolIsolation": {
+          "type": "object",
+          "properties": {
+            "requestedTools": { "type": "array" },
+            "allowedHostTools": { "type": "array" },
+            "deniedHostTools": { "type": "array" },
+            "policyConfigFingerprint": { "type": "string" },
+            "observedTools": { "type": "array" },
+            "outOfPolicyObservedTools": { "type": "array" },
+            "verified": { "type": "boolean" }
+          }
+        },
+        "networkIsolation": {
+          "type": "object",
+          "properties": {
+            "requestedPolicy": { "type": "string" },
+            "mechanism": { "type": "string" },
+            "wrapperFingerprint": { "type": ["string", "null"] },
+            "localProbePassed": { "type": ["boolean", "null"] },
+            "networkProbeBlocked": { "type": ["boolean", "null"] },
+            "usableExternalRoutePresent": { "type": ["boolean", "null"] },
+            "verified": { "type": "boolean" }
+          }
+        },
+        "stagnationDecisionAudit": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "timestamp", "scores", "compositeScore", "effectiveThreshold",
+              "gates", "frozenPolicy", "observed", "policyMatchesObserved"
+            ],
+            "properties": {
+              "timestamp": { "type": "string" },
+              "scores": {
+                "type": "object",
+                "properties": {
+                  "sameStrategy": { "type": "number" },
+                  "sameUnderlyingProblem": { "type": "number" },
+                  "surfaceVariation": { "type": "number" },
+                  "newInformation": { "type": "number" },
+                  "likelyToProgress": { "type": "number" },
+                  "strategyChangeNeeded": { "type": "number" }
+                }
+              },
+              "compositeScore": { "type": "number" },
+              "effectiveThreshold": { "type": "number" },
+              "gates": {
+                "type": "object",
+                "properties": {
+                  "scoreThresholdPassed": { "type": "boolean" },
+                  "newInformationGatePassed": { "type": "boolean" },
+                  "evidenceSignalCount": { "type": "integer" },
+                  "multiSignalEvidencePassed": { "type": "boolean" }
+                }
+              },
+              "frozenPolicy": {
+                "type": "object",
+                "properties": {
+                  "decision": { "enum": ["allow", "ask", "deny", "replan"] },
+                  "reason": { "type": "string" },
+                  "shadow": { "type": "boolean" }
+                }
+              },
+              "observed": {
+                "type": "object",
+                "properties": {
+                  "replanRequested": { "type": "boolean" },
+                  "replanQueued": { "type": "boolean" }
+                }
+              },
+              "policyMatchesObserved": { "type": "boolean" }
+            }
+          }
+        }
+      }
+    }
   }
 }

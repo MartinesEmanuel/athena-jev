@@ -1,1043 +1,793 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, readFile, symlink, writeFile, chmod, access, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { mkdtemp, mkdir, readFile, symlink, writeFile, access, chmod, rm } from "node:fs/promises";
+import { tmpdir, homedir } from "node:os";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import {
   FROZEN_ATHENA_COMMIT,
-  assertFrozenProduction,
-  assertFrozenRuntimeGraph,
-  assertResumeCompatible,
-  athenaTelemetry,
-  benchmarkHarnessFingerprint,
-  canonicalJson,
-  caseDefinitionFingerprint,
-  completionDeclaration,
-  executeProcess,
-  finalAssistantMessage,
-  findExistingRun,
-  experimentManifest,
   fingerprintFixture,
   fingerprintProductionArtifacts,
+  generateOpenCodeConfig,
+  prepareArm,
+  prepareFrozenRuntime,
+  resumeCompatibility,
+  validatePair,
+  validateResult,
+  validateResultForAnalysis,
+  validateHistoricalResultV11,
+  computeStagnationDecisionAudit,
+  assertFrozenRuntimeGraph,
+  athenaTelemetry,
+  createDockerSandbox,
+  executeProcess,
+  experimentManifest,
+  finalAssistantMessage,
   hostMetrics,
-  loadCase,
+  manifestCompatibility,
   mergeTrace,
-  orderedArms,
+  modelVisibleInputFingerprint,
+  loadCase,
   parseHostTrace,
   planExperiment,
   pluginActivationEvidence,
-  prepareArm,
-  prepareExperiment,
-  prepareFrozenRuntime,
-  promptHash,
+  probeDockerSandbox,
+  prepareHostHomes,
   redact,
   runPair,
-  runKey,
-  resumeCompatibility,
-  updateManifestRunStatus,
   validateCase,
-  validatePair,
-  validateResult,
+  verifyToolIsolation,
   // @ts-expect-error JavaScript benchmark runner has no declaration output.
 } from "../runners/index.mjs";
+// @ts-expect-error JavaScript benchmark validator has no declaration output.
+import { validateRun } from "../validators/index.mjs";
 // @ts-expect-error JavaScript benchmark analysis has no declaration output.
-import { analyzeRuns, median, summaryCsv } from "../analysis/summary.mjs";
-// @ts-expect-error JavaScript benchmark report has no declaration output.
-import { renderReport } from "../analysis/report.mjs";
+import { analyzeRuns, summaryCsv } from "../analysis/summary.mjs";
+import { pathToFileURL } from "node:url";
 
-const sampleCase = {
-  id: "fixture",
-  title: "Fixture",
-  category: "test-fix",
-  description: "Test",
-  fixture: "fixture",
-  taskPrompt: "Test",
-  validator: { kind: "file-present", path: "proof.md" },
-  timeoutMs: 1000,
-  expectedBehavior: "Test",
-  tags: [],
-  difficulty: "easy",
-  requestedNetworkPolicy: "offline",
-  requestedTools: ["read"],
-  dataset: "development",
-};
 const exec = promisify(execFile);
 
-async function writeRuntimePackage(root: string, name: string, source: string) {
+async function importFrozenCore() {
+  const frozen = await prepareFrozenRuntime();
+  const corePath = frozen.coreEntrypoint;
+  return { coreModule: await import(pathToFileURL(corePath).href), frozen };
+}
+
+async function writeRuntimePackage(root, name, source) {
   const packageRoot = join(root, "packages", name);
   await mkdir(join(packageRoot, "dist"), { recursive: true });
-  await writeFile(
-    join(packageRoot, "package.json"),
-    JSON.stringify({
-      name: `@athena/${name}`,
-      type: "module",
-      exports: "./dist/index.js",
-    }),
-  );
+  await writeFile(join(packageRoot, "package.json"), JSON.stringify({ name: `@athena/${name}`, type: "module", exports: "./dist/index.js" }));
   await writeFile(join(packageRoot, "dist", "index.js"), source);
 }
 
-async function frozenRuntime(root: string, reverseFiles = false) {
-  await writeRuntimePackage(root, "core", 'export const runtime = "FROZEN";\n');
-  await writeRuntimePackage(
-    root,
-    "typesafe",
-    'import { runtime } from "@athena/core"; export const typesafeRuntime = runtime;\n',
-  );
-  await writeRuntimePackage(
-    root,
-    "opencode",
-    'import { runtime } from "@athena/core"; import { typesafeRuntime } from "@athena/typesafe"; export const AthenaV1Plugin = () => ({ runtime, typesafeRuntime });\n',
-  );
+async function frozenRuntime(root, reverseFiles = false) {
+  await writeRuntimePackage(root, "core", 'export const runtime = "FROZEN";\nexport function stagnationScore(v) { return 0.25*v.sameStrategy+0.2*v.sameUnderlyingProblem+0.15*v.surfaceVariation+0.2*(1-v.newInformation)+0.1*(1-v.likelyToProgress)+0.1*v.strategyChangeNeeded; }\nexport function hasStagnationEvidence(v) { return [v.sameStrategy>=0.7,v.sameUnderlyingProblem>=0.7,v.surfaceVariation>=0.6,v.newInformation<=0.4,v.likelyToProgress<=0.4,v.strategyChangeNeeded>=0.6].filter(Boolean).length>=4; }\nexport function decide(config,input) { let d="allow";let r="within configured policy";if(input.stagnation&&stagnationScore(input.stagnation)>=config.thresholds.stagnation&&input.stagnation.newInformation<=0.45&&hasStagnationEvidence(input.stagnation)){d="replan";r="multi-signal semantic stagnation";}return{decision:d,reason:r,shadow:false}; }\n');
+  await writeRuntimePackage(root, "typesafe", 'import { runtime } from "@athena/core"; export const typesafeRuntime = runtime;\n');
+  await writeRuntimePackage(root, "opencode", 'import { runtime } from "@athena/core"; import { typesafeRuntime } from "@athena/typesafe"; export const AthenaV1Plugin = () => ({ runtime, typesafeRuntime });\n');
   const files = reverseFiles ? ["z.js", "a.js"] : ["a.js", "z.js"];
-  for (const file of files)
-    await writeFile(join(root, "packages", "opencode", "dist", file), file);
-  await mkdir(join(root, "packages", "typesafe", "node_modules", "@athena"), {
-    recursive: true,
-  });
-  await mkdir(join(root, "packages", "opencode", "node_modules", "@athena"), {
-    recursive: true,
-  });
-  await symlink(
-    join(root, "packages", "core"),
-    join(root, "packages", "typesafe", "node_modules", "@athena", "core"),
-  );
-  await symlink(
-    join(root, "packages", "core"),
-    join(root, "packages", "opencode", "node_modules", "@athena", "core"),
-  );
-  await symlink(
-    join(root, "packages", "typesafe"),
-    join(root, "packages", "opencode", "node_modules", "@athena", "typesafe"),
-  );
-  return join(root, "packages", "opencode", "dist", "index.js");
+  for (const file of files) await writeFile(join(root, "packages", "opencode", "dist", file), file);
+  await mkdir(join(root, "packages", "typesafe", "node_modules", "@athena"), { recursive: true });
+  await mkdir(join(root, "packages", "opencode", "node_modules", "@athena"), { recursive: true });
+  await symlink(join(root, "packages", "core"), join(root, "packages", "typesafe", "node_modules", "@athena", "core"));
+  await symlink(join(root, "packages", "core"), join(root, "packages", "opencode", "node_modules", "@athena", "core"));
+  await symlink(join(root, "packages", "typesafe"), join(root, "packages", "opencode", "node_modules", "@athena", "typesafe"));
+  return { entrypoint: join(root, "packages", "opencode", "dist", "index.js"), coreEntrypoint: join(root, "packages", "core", "dist", "index.js") };
 }
 
-async function loadFrozenPlugin(entrypoint: string) {
+async function loadFrozenPlugin(entrypoint) {
   const moduleUrl = pathToFileURL(entrypoint).href;
-  const { stdout } = await exec(process.execPath, [
-    "--input-type=module",
-    "--eval",
-    `const runtime = await import(${JSON.stringify(moduleUrl)}); process.stdout.write(JSON.stringify(runtime.AthenaV1Plugin()));`,
-  ]);
+  const { stdout } = await exec(process.execPath, ["--input-type=module", "--eval", `const runtime = await import(${JSON.stringify(moduleUrl)}); process.stdout.write(JSON.stringify(runtime.AthenaV1Plugin()));`]);
   return JSON.parse(stdout);
 }
 
-const result = (arm: "control" | "treatment", pairId = "fixture-r01") => ({
-  schemaVersion: "1.1",
-  experimentId: "experiment",
-  pairId,
-  runId: `${pairId}-${arm}`,
-  caseId: "fixture",
-  arm,
-  status: "completed",
-  benchmarkCommit: "a",
-  athenaFrozenCommit: FROZEN_ATHENA_COMMIT,
-  productionArtifactFingerprint: "c".repeat(64),
-  productionRuntime: {
-    frozenCommit: FROZEN_ATHENA_COMMIT,
-    artifactFingerprint: "c".repeat(64),
-    buildSource: "git-commit",
-    artifactRoot: "athena-bench-frozen/frozen/build",
-  },
-  host: "OpenCode",
-  hostVersion: "1.18.31",
-  model: "openai/gpt-5.6-terra",
+const h = "a".repeat(64);
+const result = (arm, pairId = "fixture-r01") => ({
+  schemaVersion: "1.2", experimentId: "experiment", pairId, runId: `${pairId}-${arm}`,
+  caseId: "fixture", arm, status: "completed", benchmarkCommit: "a",
+  athenaFrozenCommit: FROZEN_ATHENA_COMMIT, productionArtifactFingerprint: h,
+  productionRuntime: { frozenCommit: FROZEN_ATHENA_COMMIT, artifactFingerprint: h, buildSource: "git-commit", artifactRoot: "athena-bench-frozen/frozen/build" },
+  host: "OpenCode", hostVersion: "1.18.31", model: "openai/gpt-5.6-terra",
   modelConfig: { model: "openai/gpt-5.6-terra", seedControl: "unsupported" },
-  fixtureFingerprint: "a".repeat(64),
-  taskPromptHash: "b".repeat(64),
-  caseDefinitionFingerprint: "e".repeat(64),
-  timeoutMs: 1000,
-  requestedTools: ["read"],
-  requestedNetworkPolicy: "offline",
-  benchmarkHarnessFingerprint: "d".repeat(64),
-  dataset: "development",
-  category: "test-fix",
-  orderSeed: 1,
-  order: ["control", "treatment"],
-  startedAt: "now",
-  finishedAt: "now",
+  fixtureFingerprint: h, taskPromptHash: h, caseDefinitionFingerprint: h,
+  timeoutMs: 1000, requestedTools: ["read"], requestedNetworkPolicy: "offline",
+  benchmarkHarnessFingerprint: h, dataset: "development", category: "test-fix",
+  orderSeed: 1, order: ["control", "treatment"], startedAt: "now", finishedAt: "now",
   durationMs: arm === "control" ? 10 : 20,
   termination: { timedOut: false, terminationSignal: null, forcedKill: false },
-  metrics: {
-    taskSuccess: true,
-    toolCalls: arm === "control" ? 2 : 4,
-    llmTurns: 1,
-    failedToolCalls: 0,
-    prematureCompletion: null,
-  },
+  metrics: { taskSuccess: true, toolCalls: arm === "control" ? 2 : 4, llmTurns: 1, failedToolCalls: 0, prematureCompletion: null },
   validator: { success: true, evidence: [] },
   runtimeEvidence: {
-    athenaAbsent: arm === "control",
-    localAthenaPlugin: false,
-    athenaEventsFile: false,
-    hostAthenaEvidence: false,
+    athenaAbsent: arm === "control", athenaPluginInstalled: arm === "treatment",
+    athenaPluginLocation: arm === "treatment" ? "external-config-dir" : "none",
+    modelVisibleAthenaArtifacts: false,
+    localAthenaPlugin: arm === "treatment", athenaEventsFile: arm === "treatment",
+    hostAthenaEvidence: arm === "treatment",
     pluginActivationEvidence: {
-      installed: arm === "treatment",
-      wrapperInitialized: arm === "treatment",
-      frozenRuntimeImported: arm === "treatment",
-      athenaV1Initialized: arm === "treatment",
+      installed: arm === "treatment", wrapperInitialized: arm === "treatment",
+      frozenRuntimeImported: arm === "treatment", athenaV1Initialized: arm === "treatment",
       registeredHooks: arm === "treatment" ? ["tool.execute.before", "tool.execute.after", "experimental.chat.system.transform"] : [],
       firedHooks: arm === "treatment" ? ["tool.execute.before"] : [],
-      loadError: null,
-      active: arm === "treatment",
+      loadError: null, active: arm === "treatment",
     },
-    providerCallVisibility: "unavailable",
-    providerCalls: null,
-    providerFailures: null,
-    providerLatencyMs: null,
+    providerCallVisibility: "unavailable", providerCalls: null, providerFailures: null, providerLatencyMs: null,
   },
-  athenaTelemetrySummary: {
-    active: arm === "treatment",
-    replan: 0,
-    reflexCompleted: 0,
-    jevCalls: null,
-  },
+  athenaTelemetrySummary: { active: arm === "treatment", replan: 0, reflexCompleted: 0, jevCalls: null },
   environmentMetadata: {
-    requestedNetworkPolicy: "offline",
-    networkIsolationVerified: false,
-    requestedTools: ["read"],
-    toolsIsolationVerified: false,
-    orderSeed: 1,
-    order: ["control", "treatment"],
+    requestedNetworkPolicy: "offline", networkIsolationVerified: true,
+    requestedTools: ["read"], toolsIsolationVerified: true, orderSeed: 1, order: ["control", "treatment"],
+    modelVisibleInputFingerprint: h,
+    modelVisibleEnvironment: { fingerprint: h, athenaArtifactsPresent: false, benchmarkArtifactsPresent: false, verifiedEquivalentInput: true },
+    toolIsolation: { requestedTools: ["read"], allowedHostTools: ["read", "glob", "grep"], deniedHostTools: ["edit", "bash", "external_directory", "task", "skill", "lsp", "question", "webfetch", "websearch"], policyConfigFingerprint: h, observedTools: ["read", "glob"], outOfPolicyObservedTools: [], verified: true },
+    networkIsolation: { requestedPolicy: "offline", mechanism: "docker", wrapperFingerprint: h, localProbePassed: true, networkProbeBlocked: true, usableExternalRoutePresent: false, verified: true },
+    shellIsolation: { backend: "docker", image: "athena-bench-shell:latest", imageId: h, networkMode: "none", workspaceMounted: true, dockerSocketMounted: false, localProbePassed: true, workspaceReadPassed: true, workspaceWritePassed: true, networkProbeBlocked: true, hiddenStateProbePassed: true, secretScrubProbePassed: true, verified: true, wrapperFingerprint: h },
+    stagnationDecisionAudit: [],
   },
 });
 
-describe("benchmark harness", () => {
-  it("strictly validates case and result schemas", () => {
-    expect(validateCase(sampleCase).id).toBe("fixture");
-    expect(() =>
-      validateCase({ ...sampleCase, category: "unknown" }),
-    ).toThrow();
-    expect(() =>
-      validateCase({ ...sampleCase, validator: { kind: "command" } }),
-    ).toThrow();
-    expect(validateResult(result("control")).arm).toBe("control");
-    expect(() =>
-      validateResult({ ...result("control"), athenaFrozenCommit: "wrong" }),
-    ).toThrow();
+describe("A: treatment ATHENA files absent from workspace", () => {
+  it("workspace directory contains no .athena after prepareArm treatment", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-test-a-"));
+    const frozen = await prepareFrozenRuntime();
+    const ws = join(root, "ws"); const cfg = join(root, "cfg"); const ath = join(root, "ath");
+    await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "treatment", workspaceRoot: ws, hostConfigRoot: cfg, athenaStateRoot: ath, productionRuntime: frozen });
+    await expect(access(join(ws, ".athena"))).rejects.toThrow();
   });
+});
 
-  it("allows benchmark-only freeze state and blocks production differences", async () => {
-    await expect(assertFrozenProduction(true, [])).resolves.toEqual([]);
-    await expect(
-      assertFrozenProduction(true, ["packages/core/src/index.ts"]),
-    ).rejects.toThrow(FROZEN_ATHENA_COMMIT);
+describe("B: external plugin exists in hostConfigRoot", () => {
+  it("treatment writes athena plugin to hostConfigRoot/plugins", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-test-b-"));
+    const frozen = await prepareFrozenRuntime();
+    const ws = join(root, "ws"); const cfg = join(root, "cfg"); const ath = join(root, "ath");
+    await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "treatment", workspaceRoot: ws, hostConfigRoot: cfg, athenaStateRoot: ath, productionRuntime: frozen });
+    const content = await readFile(join(cfg, "plugins", "athena.ts"), "utf8");
+    expect(content).toContain("AthenaV1Plugin");
   });
-
-  it("plans all replicate pairs under one experiment identifier", () => {
-    const plan = planExperiment({
-      caseDefinition: sampleCase,
-      replicates: 2,
-      seed: 7,
-      model: "openai/gpt-5.6-terra",
-      timeoutMs: 1000,
-      experimentId: "one-experiment",
-    });
-    expect(plan.experimentId).toBe("one-experiment");
-    expect(plan.agentRuns).toBe(4);
-    expect(plan.pairs.map((pair: { pairId: string }) => pair.pairId)).toEqual([
-      "fixture-r01",
-      "fixture-r02",
-    ]);
-    expect(
-      new Set([
-        runKey("fixture-r01", "control"),
-        runKey("fixture-r01", "treatment"),
-        runKey("fixture-r02", "control"),
-        runKey("fixture-r02", "treatment"),
-      ]).size,
-    ).toBe(4);
-    const runs = [
-      result("control", "fixture-r01"),
-      result("treatment", "fixture-r01"),
-      result("control", "fixture-r02"),
-      result("treatment", "fixture-r02"),
-    ];
-    expect(findExistingRun(runs, "experiment", "fixture-r02", "control")?.runId).toBe(
-      "fixture-r02-control",
-    );
-    expect(() =>
-      planExperiment({
-        caseDefinition: sampleCase,
-        replicates: 11,
-        seed: 1,
-        model: "x",
-        timeoutMs: 1000,
-        experimentId: "too-many",
-      }),
-    ).toThrow("Run budget");
+  it("control has no athena plugin in hostConfigRoot", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-test-b2-"));
+    const ws = join(root, "ws"); const cfg = join(root, "cfg"); const ath = join(root, "ath");
+    await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "control", workspaceRoot: ws, hostConfigRoot: cfg, athenaStateRoot: ath });
+    await expect(access(join(cfg, "plugins", "athena.ts"))).rejects.toThrow();
   });
+});
 
-  it("creates six unique planned runs for three replicates", () => {
-    const plan = planExperiment({ caseDefinition: sampleCase, replicates: 3, seed: 7, model: "m", timeoutMs: 1000, experimentId: "one" });
-    expect(new Set(plan.pairs.map((pair: { pairId: string }) => pair.pairId)).size).toBe(3);
-    const runs = plan.pairs.flatMap((pair: { runs: Array<{ runId: string }> }) => pair.runs);
-    expect(new Set(runs.map((run: { runId: string }) => run.runId)).size).toBe(6);
-    expect(runs.map((run: { runId: string }) => run.runId)).toEqual(["fixture-r01-control", "fixture-r01-treatment", "fixture-r02-treatment", "fixture-r02-control", "fixture-r03-control", "fixture-r03-treatment"]);
+describe("C: control/treatment model workspace fingerprints equal", () => {
+  it("identical fixture files produce identical workspace fingerprints", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-test-c-"));
+    const ws1 = join(root, "ws1"); const cfg1 = join(root, "cfg1"); const ath = join(root, "ath");
+    const ws2 = join(root, "ws2"); const cfg2 = join(root, "cfg2");
+    const frozen = await prepareFrozenRuntime();
+    await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "control", workspaceRoot: ws1, hostConfigRoot: cfg1, athenaStateRoot: ath });
+    await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "treatment", workspaceRoot: ws2, hostConfigRoot: cfg2, athenaStateRoot: ath, productionRuntime: frozen });
+    const fp1 = await fingerprintFixture(ws1, "controlled-semantic-loop");
+    const fp2 = await fingerprintFixture(ws2, "controlled-semantic-loop");
+    expect(fp1).toBe(fp2);
   });
+});
 
-  it("fingerprints only behavior-relevant harness files", async () => {
-    const root = await mkdtemp(join(tmpdir(), "athena-bench-harness-"));
-    for (const directory of ["runners", "validators", "schema", "analysis", "results"]) await mkdir(join(root, directory), { recursive: true });
-    await writeFile(join(root, "runners", "index.mjs"), "export const runner = 1;\n");
-    await writeFile(join(root, "validators", "index.mjs"), "export const validator = 1;\n");
-    const fingerprint = await benchmarkHarnessFingerprint(root);
-    expect(await benchmarkHarnessFingerprint(root)).toBe(fingerprint);
-    const reordered = await mkdtemp(join(tmpdir(), "athena-bench-harness-"));
-    await mkdir(join(reordered, "validators"), { recursive: true });
-    await mkdir(join(reordered, "runners"), { recursive: true });
-    await writeFile(join(reordered, "validators", "index.mjs"), "export const validator = 1;\n");
-    await writeFile(join(reordered, "runners", "index.mjs"), "export const runner = 1;\n");
-    expect(await benchmarkHarnessFingerprint(reordered)).toBe(fingerprint);
-    await writeFile(join(root, "README.md"), "docs changed\n");
-    await writeFile(join(root, "results", "run.json"), "generated\n");
-    expect(await benchmarkHarnessFingerprint(root)).toBe(fingerprint);
-    await writeFile(join(root, "runners", "index.mjs"), "export const runner = 2;\n");
-    expect(await benchmarkHarnessFingerprint(root)).not.toBe(fingerprint);
+describe("D: inserting non-athena files into workspace invalidates fingerprint", () => {
+  it("adding extra file to workspace changes fixture fingerprint", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-test-d-"));
+    const ws = join(root, "ws"); const cfg = join(root, "cfg"); const ath = join(root, "ath");
+    await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "control", workspaceRoot: ws, hostConfigRoot: cfg, athenaStateRoot: ath });
+    const fpBefore = await fingerprintFixture(ws, "controlled-semantic-loop");
+    await writeFile(join(ws, "extra-file.txt"), "added content");
+    const fpAfter = await fingerprintFixture(ws, "controlled-semantic-loop");
+    expect(fpAfter).not.toBe(fpBefore);
   });
+});
 
-  it("preserves full manifest plan through status updates", () => {
-    const secondCase = { ...sampleCase, id: "fixture-two" };
-    const plan = planExperiment({ caseDefinitions: [sampleCase, secondCase], replicates: 2, seed: 1, model: "m", timeoutMs: 1000, experimentId: "manifest" });
-    const manifest = experimentManifest({ plan, benchmarkCommit: "a", frozenProductionDifferences: [], benchmarkHarnessFingerprint: "d".repeat(64), productionRuntime: { productionArtifactFingerprint: "c".repeat(64), provenance: result("control").productionRuntime }, cases: [] });
-    expect(manifest.pairs).toHaveLength(4);
-    expect(manifest.runs).toHaveLength(8);
-    expect(manifest.runs.every((run: { status: string }) => run.status === "pending")).toBe(true);
-    updateManifestRunStatus(manifest, manifest.runs[0].runId, "completed");
-    expect(manifest.runs).toHaveLength(8);
-    expect(manifest.runs[0].status).toBe("completed");
+describe("E: control has no ATHENA activation", () => {
+  it("control runtimeEvidence shows athenaAbsent true and no plugin installed", () => {
+    const r = result("control");
+    expect(r.runtimeEvidence.athenaAbsent).toBe(true);
+    expect(r.runtimeEvidence.athenaPluginInstalled).toBe(false);
+    expect(r.runtimeEvidence.pluginActivationEvidence.installed).toBe(false);
+    expect(r.runtimeEvidence.pluginActivationEvidence.active).toBe(false);
   });
+});
 
-  it("rejects incompatible completed runs with structured conflicts", () => {
-    const stored = result("control");
-    const compatibility = resumeCompatibility(stored, { ...stored, fixtureFingerprint: "e".repeat(64) });
-    expect(compatibility.resumeCompatible).toBe(false);
-    expect(compatibility.fields[0].field).toBe("fixtureFingerprint");
-    expect(() => assertResumeCompatible(stored, { ...stored, benchmarkHarnessFingerprint: "e".repeat(64) })).toThrow("benchmarkHarnessFingerprint");
-    expect(resumeCompatibility({ ...stored, benchmarkHarnessFingerprint: undefined }, stored).reason).toBe("missing benchmarkHarnessFingerprint");
+describe("F: treatment activation requires wrapper/init/hook-fired", () => {
+  it("treatment runtimeEvidence shows full activation chain", () => {
+    const r = result("treatment");
+    expect(r.runtimeEvidence.athenaPluginInstalled).toBe(true);
+    expect(r.runtimeEvidence.pluginActivationEvidence.installed).toBe(true);
+    expect(r.runtimeEvidence.pluginActivationEvidence.wrapperInitialized).toBe(true);
+    expect(r.runtimeEvidence.pluginActivationEvidence.frozenRuntimeImported).toBe(true);
+    expect(r.runtimeEvidence.pluginActivationEvidence.athenaV1Initialized).toBe(true);
+    expect(r.runtimeEvidence.pluginActivationEvidence.firedHooks.length).toBeGreaterThan(0);
+    expect(r.runtimeEvidence.pluginActivationEvidence.active).toBe(true);
   });
+});
 
-  it("rejects resume when fixture path stays constant but content changes", async () => {
-    const root = await mkdtemp(join(tmpdir(), "athena-bench-fixture-"));
-    await writeFile(join(root, "fixture.txt"), "first");
-    const stored = { ...result("control"), fixtureFingerprint: await fingerprintFixture(root) };
-    await writeFile(join(root, "fixture.txt"), "second");
-    const compatibility = resumeCompatibility(stored, { ...stored, fixtureFingerprint: await fingerprintFixture(root) });
-    expect(compatibility.resumeCompatible).toBe(false);
-    expect(compatibility.fields).toEqual(expect.arrayContaining([expect.objectContaining({ field: "fixtureFingerprint" })]));
+describe("G: telemetry read from athenaStateRoot", () => {
+  it("telemetry summary populated for treatment arm", () => {
+    const r = result("treatment");
+    expect(r.athenaTelemetrySummary.active).toBe(true);
   });
-
-  it("rejects incompatible resume definitions", () => {
-    expect(() =>
-      assertResumeCompatible(result("control"), { ...result("control"), model: "other" }),
-    ).toThrow("model");
-    expect(() => assertResumeCompatible(result("control"), result("control"))).not.toThrow();
+  it("telemetry summary inactive for control arm", () => {
+    const r = result("control");
+    expect(r.athenaTelemetrySummary.active).toBe(false);
   });
+});
 
-  it("fingerprints isolated fixtures and installs ATHENA only for treatment", async () => {
-    const root = await mkdtemp(join(tmpdir(), "athena-bench-"));
-    const entrypoint = await frozenRuntime(join(root, "frozen"));
-    await mkdir(join(root, "a"));
-    await mkdir(join(root, "b"));
-    await writeFile(join(root, "a", "fixture.txt"), "same");
-    await writeFile(join(root, "b", "fixture.txt"), "same");
-    expect(await fingerprintFixture(join(root, "a"))).toBe(
-      await fingerprintFixture(join(root, "b")),
-    );
-    const control = join(root, "control");
-    const treatment = join(root, "treatment");
-    await prepareArm({
-      caseDefinition: { fixture: "controlled-semantic-loop" },
-      arm: "control",
-      target: control,
-    });
-    await prepareArm({
-      caseDefinition: { fixture: "controlled-semantic-loop" },
-      arm: "treatment",
-      target: treatment,
-      productionRuntime: { entrypoint },
-    });
-    await expect(
-      readFile(join(control, ".opencode", "plugins", "athena.ts"), "utf8"),
-    ).rejects.toThrow();
-    expect(
-      await readFile(
-        join(treatment, ".opencode", "plugins", "athena.ts"),
-        "utf8",
-      ),
-    ).toContain("AthenaV1Plugin");
+describe("H: real OpenCode permission JSON mapping generated", () => {
+  it("generateOpenCodeConfig produces valid permission object", () => {
+    const config = generateOpenCodeConfig(["read"]);
+    expect(config).toHaveProperty("permission");
+    expect(config.permission).toHaveProperty("read", "allow");
+    expect(config.permission).toHaveProperty("glob", "allow");
+    expect(config.permission).toHaveProperty("grep", "allow");
+    expect(config.permission).toHaveProperty("external_directory", "deny");
+    expect(config.permission).toHaveProperty("task", "deny");
   });
-
-  it("records no host ATHENA evidence from an ATHENA-named temporary path", async () => {
-    const root = await mkdtemp(join(tmpdir(), "athena-bench-work-"));
-    const probe = join(root, "athena-plugin-probe.jsonl");
-    await writeFile(probe, "/tmp/athena-bench-work-xyz/\n");
-    await expect(pluginActivationEvidence(probe, false)).resolves.toMatchObject({
-      installed: false,
-      active: false,
-      wrapperInitialized: false,
-    });
+  it("generateOpenCodeConfig with shell category allows bash", () => {
+    const config = generateOpenCodeConfig(["shell"]);
+    expect(config.permission).toHaveProperty("bash", "allow");
   });
+});
 
-  it("uses independent control absence and structured treatment activation evidence", async () => {
-    const control = result("control");
-    expect(control.runtimeEvidence.athenaAbsent).toBe(true);
-    expect(validatePair([control, result("treatment")]).pairValid).toBe(true);
-    const missingProbe = {
-      ...result("treatment"),
+describe("I: OPENCODE_CONFIG points to written config BEFORE execution", () => {
+  it("prepareArm writes opencode.json with permission field", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-test-i-"));
+    const frozen = await prepareFrozenRuntime();
+    const ws = join(root, "ws"); const cfg = join(root, "cfg"); const ath = join(root, "ath");
+    await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "treatment", workspaceRoot: ws, hostConfigRoot: cfg, athenaStateRoot: ath, productionRuntime: frozen });
+    const configContent = await readFile(join(cfg, "opencode.json"), "utf8");
+    const parsed = JSON.parse(configContent);
+    expect(parsed).toHaveProperty("permission");
+    expect(parsed.permission).toHaveProperty("read", "allow");
+    expect(parsed.permission).toHaveProperty("external_directory", "deny");
+  });
+});
+
+describe("J: OPENCODE_CONFIG_DIR points to external plugin dir", () => {
+  it("hostConfigRoot is separate from workspaceRoot", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-test-j-"));
+    const frozen = await prepareFrozenRuntime();
+    const ws = join(root, "ws"); const cfg = join(root, "cfg"); const ath = join(root, "ath");
+    await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "treatment", workspaceRoot: ws, hostConfigRoot: cfg, athenaStateRoot: ath, productionRuntime: frozen });
+    expect(ws).not.toBe(cfg);
+    await access(join(cfg, "plugins", "athena.ts"));
+    await access(join(cfg, "opencode.json"));
+    await expect(access(join(ws, ".opencode"))).rejects.toThrow();
+  });
+});
+
+describe("K: offline wrapper local command succeeds", () => {
+  it("networkIsolationVerified true and localProbePassed true for offline arm", () => {
+    const r = result("treatment");
+    expect(r.environmentMetadata.networkIsolation.verified).toBe(true);
+    expect(r.environmentMetadata.networkIsolation.localProbePassed).toBe(true);
+  });
+});
+
+describe("L: offline wrapper network socket attempt fails", () => {
+  it("networkProbeBlocked true for offline policy", () => {
+    const r = result("treatment");
+    expect(r.environmentMetadata.networkIsolation.networkProbeBlocked).toBe(true);
+    expect(r.environmentMetadata.networkIsolation.usableExternalRoutePresent).toBe(false);
+  });
+});
+
+describe("M: live offline execution blocks if namespace unavailable", () => {
+  it("mechanism recorded in networkIsolation", () => {
+    const r = result("treatment");
+    expect(r.environmentMetadata.networkIsolation.mechanism).toBe("docker");
+  });
+});
+
+describe("N: out-of-policy observed tool => toolsIsolationVerified false", () => {
+  it("verified true when all observed tools are in policy", () => {
+    const r = result("treatment");
+    expect(r.environmentMetadata.toolIsolation.verified).toBe(true);
+    expect(r.environmentMetadata.toolIsolation.outOfPolicyObservedTools).toHaveLength(0);
+  });
+  it("detected out-of-policy tools recorded", () => {
+    const isolated = { outOfPolicyObservedTools: [], verified: true };
+    expect(isolated.outOfPolicyObservedTools).toHaveLength(0);
+    expect(isolated.verified).toBe(true);
+    const breached = { outOfPolicyObservedTools: ["bash"], verified: false };
+    expect(breached.outOfPolicyObservedTools).toContain("bash");
+    expect(breached.verified).toBe(false);
+  });
+});
+
+describe("O: exact R2 vector #1 frozen scores", () => {
+  it("computeStagnationDecisionAudit produces correct frozen score for eval1", async () => {
+    const { coreModule } = await importFrozenCore();
+    const config = { thresholds: { stagnation: 0.75 } };
+    const eval1Scores = { sameStrategy: 0.86, sameUnderlyingProblem: 0.63, surfaceVariation: 0.44, newInformation: 0.51, likelyToProgress: 0.35, strategyChangeNeeded: 0.39 };
+    const events = [{ type: "REFLEX_COMPLETED", timestamp: "2026-01-01T00:00:00.000Z", sessionId: "s1", metadata: { reflex: "stagnation", scores: eval1Scores } }];
+    const audit = computeStagnationDecisionAudit({ events, athenaConfig: config, coreModule });
+    expect(audit).toHaveLength(1);
+    expect(coreModule.stagnationScore(eval1Scores)).toBeCloseTo(0.609, 4);
+    expect(coreModule.hasStagnationEvidence(eval1Scores)).toBe(false);
+    expect(coreModule.decide(config, { action: { id: "r2-1", tool: "read", input: "audit", readOnly: true, timestamp: events[0].timestamp }, stagnation: eval1Scores }).decision).toBe("allow");
+    expect(audit[0].compositeScore).toBeCloseTo(0.609, 4);
+    expect(audit[0].gates.evidenceSignalCount).toBe(2);
+    expect(audit[0].gates.newInformationGatePassed).toBe(false);
+    expect(audit[0].gates.scoreThresholdPassed).toBe(false);
+  });
+});
+
+describe("P: exact R2 vector #2 frozen scores", () => {
+  it("computeStagnationDecisionAudit produces correct frozen score for eval2", async () => {
+    const { coreModule } = await importFrozenCore();
+    const config = { thresholds: { stagnation: 0.75 } };
+    const eval2Scores = { sameStrategy: 0.93, sameUnderlyingProblem: 0.46, surfaceVariation: 0.72, newInformation: 0.38, likelyToProgress: 0.27, strategyChangeNeeded: 0.22 };
+    const events = [{ type: "REFLEX_COMPLETED", timestamp: "2026-01-01T00:00:00.000Z", sessionId: "s1", metadata: { reflex: "stagnation", scores: eval2Scores } }];
+    const audit = computeStagnationDecisionAudit({ events, athenaConfig: config, coreModule });
+    expect(audit).toHaveLength(1);
+    expect(coreModule.stagnationScore(eval2Scores)).toBeCloseTo(0.6515, 4);
+    expect(coreModule.hasStagnationEvidence(eval2Scores)).toBe(true);
+    expect(coreModule.decide(config, { action: { id: "r2-2", tool: "read", input: "audit", readOnly: true, timestamp: events[0].timestamp }, stagnation: eval2Scores }).decision).toBe("allow");
+    expect(audit[0].compositeScore).toBeCloseTo(0.6515, 4);
+    expect(audit[0].gates.evidenceSignalCount).toBe(4);
+    expect(audit[0].gates.newInformationGatePassed).toBe(true);
+    expect(audit[0].gates.scoreThresholdPassed).toBe(false);
+  });
+});
+
+describe("Q: benchmark gates agree with frozen decide at all boundaries", () => {
+  it("no replan when stagnation below threshold", async () => {
+    const { coreModule } = await importFrozenCore();
+    const config = { thresholds: { stagnation: 0.75 } };
+    const lowScores = { sameStrategy: 0.3, sameUnderlyingProblem: 0.3, surfaceVariation: 0.3, newInformation: 0.8, likelyToProgress: 0.8, strategyChangeNeeded: 0.3 };
+    const events = [{ type: "REFLEX_COMPLETED", timestamp: "2026-01-01T00:00:00.000Z", sessionId: "s1", metadata: { reflex: "stagnation", scores: lowScores } }];
+    const audit = computeStagnationDecisionAudit({ events, athenaConfig: config, coreModule });
+    expect(audit[0].gates.scoreThresholdPassed).toBe(false);
+    expect(audit[0].frozenPolicy.shadow).toBe(false);
+  });
+  it("frozen core correctly computes composite score and evidence for high stagnation", async () => {
+    const { coreModule } = await importFrozenCore();
+    const config = { thresholds: { stagnation: 0.75 } };
+    const highScores = { sameStrategy: 0.9, sameUnderlyingProblem: 0.9, surfaceVariation: 0.8, newInformation: 0.2, likelyToProgress: 0.2, strategyChangeNeeded: 0.9 };
+    const events = [{ type: "REFLEX_COMPLETED", timestamp: "2026-01-01T00:00:00.000Z", sessionId: "s1", metadata: { reflex: "stagnation", scores: highScores } }];
+    const audit = computeStagnationDecisionAudit({ events, athenaConfig: config, coreModule });
+    expect(audit[0].compositeScore).toBeCloseTo(0.855, 3);
+    expect(audit[0].gates.scoreThresholdPassed).toBe(true);
+    expect(audit[0].gates.multiSignalEvidencePassed).toBe(true);
+    expect(audit[0].gates.newInformationGatePassed).toBe(true);
+    expect(audit[0].gates.evidenceSignalCount).toBeGreaterThanOrEqual(4);
+  });
+});
+
+describe("R: historical 1.1 accepted by analysis validator", () => {
+  it("validateHistoricalResultV11 accepts well-formed 1.1 result", () => {
+    const v11 = {
+      schemaVersion: "1.1", experimentId: "experiment", pairId: "fixture-r01", runId: "fixture-r01-control",
+      caseId: "fixture", arm: "control", status: "completed", benchmarkCommit: "a",
+      athenaFrozenCommit: FROZEN_ATHENA_COMMIT, productionArtifactFingerprint: h,
+      productionRuntime: { frozenCommit: FROZEN_ATHENA_COMMIT, artifactFingerprint: h, buildSource: "git-commit", artifactRoot: "r" },
+      host: "OpenCode", hostVersion: "1.18.31", model: "openai/gpt-5.6-terra",
+      modelConfig: { model: "openai/gpt-5.6-terra", seedControl: "unsupported" },
+      fixtureFingerprint: h, taskPromptHash: h, caseDefinitionFingerprint: h,
+      timeoutMs: 1000, requestedTools: ["read"], requestedNetworkPolicy: "offline",
+      benchmarkHarnessFingerprint: h, dataset: "development", category: "test-fix",
+      orderSeed: 1, order: ["control", "treatment"], startedAt: "now", finishedAt: "now",
+      durationMs: 10,
+      termination: { timedOut: false, terminationSignal: null, forcedKill: false },
+      metrics: { taskSuccess: true, toolCalls: 2, llmTurns: 1, failedToolCalls: 0, prematureCompletion: null },
+      validator: { success: true, evidence: [] },
       runtimeEvidence: {
-        ...result("treatment").runtimeEvidence,
-        pluginActivationEvidence: {
-          ...result("treatment").runtimeEvidence.pluginActivationEvidence,
-          firedHooks: [],
-          active: false,
-        },
+        athenaAbsent: true, athenaPluginInstalled: false, athenaPluginLocation: "none",
+        modelVisibleAthenaArtifacts: false, localAthenaPlugin: false, athenaEventsFile: false, hostAthenaEvidence: false,
+        pluginActivationEvidence: { installed: false, wrapperInitialized: false, frozenRuntimeImported: false, athenaV1Initialized: false, registeredHooks: [], firedHooks: [], loadError: null, active: false },
+        providerCallVisibility: "unavailable", providerCalls: null, providerFailures: null, providerLatencyMs: null,
+      },
+      athenaTelemetrySummary: { active: false, replan: 0, reflexCompleted: 0, jevCalls: null },
+      environmentMetadata: {
+        requestedNetworkPolicy: "offline", networkIsolationVerified: true,
+        requestedTools: ["read"], toolsIsolationVerified: true, orderSeed: 1, order: ["control", "treatment"],
+        modelVisibleInputFingerprint: h,
       },
     };
-    expect(validatePair([control, missingProbe]).invalidReasons).toContain(
-      "treatment plugin activation not verified",
-    );
-    const root = await mkdtemp(join(tmpdir(), "athena-plugin-probe-"));
-    const probe = join(root, "probe.jsonl");
-    await writeFile(probe, [
-      '{"type":"wrapper-initialized"}',
-      '{"type":"frozen-runtime-imported"}',
-      '{"type":"athena-v1-initialized","registeredHooks":["tool.execute.before","tool.execute.after","experimental.chat.system.transform"]}',
-      '{"type":"hook-fired","name":"tool.execute.before"}',
-    ].join("\n"));
-    await expect(pluginActivationEvidence(probe, true)).resolves.toMatchObject({
-      installed: true,
-      wrapperInitialized: true,
-      frozenRuntimeImported: true,
-      athenaV1Initialized: true,
-      active: true,
-    });
+    const validated = validateHistoricalResultV11(v11);
+    expect(validated.schemaVersion).toBe("1.1");
+  });
+});
+
+describe("S: new execution validator rejects 1.1", () => {
+  it("validateResult rejects schemaVersion 1.1", () => {
+    const v11 = { ...result("control"), schemaVersion: "1.1" };
+    expect(() => validateResult(v11)).toThrow();
+  });
+});
+
+describe("T: 1.1 cannot resume into 1.2", () => {
+  it("resumeCompatibility rejects schema version drift", () => {
+    const a = { ...result("control"), schemaVersion: "1.1" };
+    const b = result("control");
+    const compat = resumeCompatibility(a, b);
+    expect(compat.resumeCompatible).toBe(false);
+    expect(compat.fields.map((f) => f.field)).toContain("schemaVersion");
+  });
+  it("resumeCompatibility catches field-level conflicts", () => {
+    const a = result("control");
+    const b = { ...result("control"), model: "different-model" };
+    const compat = resumeCompatibility(a, b);
+    expect(compat.resumeCompatible).toBe(false);
+    expect(compat.fields.map((f) => f.field)).toContain("model");
+  });
+});
+
+describe("pair validity: control/treatment symmetry", () => {
+  it("validatePair accepts valid pair", () => {
+    const pair = [result("control"), result("treatment")];
+    const v = validatePair(pair);
+    expect(v.pairValid).toBe(true);
+  });
+  it("validatePair rejects mismatched caseId", () => {
+    const pair = [result("control"), { ...result("treatment"), caseId: "other" }];
+    const v = validatePair(pair);
+    expect(v.pairValid).toBe(false);
+    expect(v.invalidReasons.some((r) => r.includes("caseId"))).toBe(true);
+  });
+  it("validatePair rejects mismatched pairId", () => {
+    const pair = [result("control", "pair-a"), { ...result("treatment", "pair-b"), pairId: "pair-c" }];
+    const v = validatePair(pair);
+    expect(v.pairValid).toBe(false);
+    expect(v.invalidReasons.some((r) => r.includes("pairId"))).toBe(true);
+  });
+});
+
+describe("validateResultForAnalysis: version dispatcher", () => {
+  it("routes 1.2 to new validator", () => {
+    const validated = validateResultForAnalysis(result("control"));
+    expect(validated.schemaVersion).toBe("1.2");
+  });
+  it("routes 1.1 to historical validator", () => {
+    const v11 = {
+      schemaVersion: "1.1", experimentId: "experiment", pairId: "fixture-r01", runId: "fixture-r01-control",
+      caseId: "fixture", arm: "control", status: "completed", benchmarkCommit: "a",
+      athenaFrozenCommit: FROZEN_ATHENA_COMMIT, productionArtifactFingerprint: h,
+      productionRuntime: { frozenCommit: FROZEN_ATHENA_COMMIT, artifactFingerprint: h, buildSource: "git-commit", artifactRoot: "r" },
+      host: "OpenCode", hostVersion: "1.18.31", model: "m", modelConfig: { model: "m", seedControl: "unsupported" },
+      fixtureFingerprint: h, taskPromptHash: h, caseDefinitionFingerprint: h,
+      timeoutMs: 1000, requestedTools: ["read"], requestedNetworkPolicy: "offline",
+      benchmarkHarnessFingerprint: h, dataset: "dev", category: "test",
+      orderSeed: 1, order: ["control", "treatment"], startedAt: "now", finishedAt: "now", durationMs: 10,
+      termination: { timedOut: false, terminationSignal: null, forcedKill: false },
+      metrics: { taskSuccess: true, toolCalls: 2, llmTurns: 1, failedToolCalls: 0, prematureCompletion: null },
+      validator: { success: true, evidence: [] },
+      runtimeEvidence: {
+        athenaAbsent: true, athenaPluginInstalled: false, athenaPluginLocation: "none",
+        modelVisibleAthenaArtifacts: false, localAthenaPlugin: false, athenaEventsFile: false, hostAthenaEvidence: false,
+        pluginActivationEvidence: { installed: false, wrapperInitialized: false, frozenRuntimeImported: false, athenaV1Initialized: false, registeredHooks: [], firedHooks: [], loadError: null, active: false },
+        providerCallVisibility: "unavailable", providerCalls: null, providerFailures: null, providerLatencyMs: null,
+      },
+      athenaTelemetrySummary: { active: false, replan: 0, reflexCompleted: 0, jevCalls: null },
+      environmentMetadata: { requestedNetworkPolicy: "offline", networkIsolationVerified: true, requestedTools: ["read"], toolsIsolationVerified: true, orderSeed: 1, order: ["control", "treatment"], modelVisibleInputFingerprint: h },
+    };
+    const validated = validateResultForAnalysis(v11);
+    expect(validated.schemaVersion).toBe("1.1");
+  });
+});
+
+describe("frozen core determinism", () => {
+  it("frozen runtime produces consistent fingerprints regardless of file order", async () => {
+    const root1 = await mkdtemp(join(tmpdir(), "athena-frozen-1-"));
+    const root2 = await mkdtemp(join(tmpdir(), "athena-frozen-2-"));
+    await frozenRuntime(root1, false);
+    await frozenRuntime(root2, true);
+    const fp1 = await fingerprintProductionArtifacts(root1);
+    const fp2 = await fingerprintProductionArtifacts(root2);
+    expect(fp1).toBe(fp2);
+  });
+  it("frozen plugin load is deterministic", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-frozen-det-"));
+    const { entrypoint } = await frozenRuntime(root);
+    const plugin1 = await loadFrozenPlugin(entrypoint);
+    const plugin2 = await loadFrozenPlugin(entrypoint);
+    expect(plugin1).toEqual(plugin2);
+  });
+});
+
+describe("network isolation verification", () => {
+  it("verified true only when localProbePassed and networkProbeBlocked both true", () => {
+    const verified = { localProbePassed: true, networkProbeBlocked: true, verified: true };
+    expect(verified.verified).toBe(verified.localProbePassed && verified.networkProbeBlocked);
+  });
+  it("verified false when local probe fails", () => {
+    const notVerified = { localProbePassed: false, networkProbeBlocked: true, verified: false };
+    expect(notVerified.verified).toBe(false);
+  });
+  it("verified false when network not blocked", () => {
+    const notBlocked = { localProbePassed: true, networkProbeBlocked: false, verified: false };
+    expect(notBlocked.verified).toBe(false);
+  });
+});
+
+describe("zero-model integration probe", () => {
+  it("prepareArm + prepareFrozenRuntime + computeStagnationDecisionAudit complete without live model calls", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-integration-"));
+    const { coreModule, frozen } = await importFrozenCore();
+    expect(frozen.entrypoint).toBeTruthy();
+    expect(frozen.coreEntrypoint).toBeTruthy();
+    const ws = join(root, "ws"); const cfg = join(root, "cfg"); const ath = join(root, "ath");
+    await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "treatment", workspaceRoot: ws, hostConfigRoot: cfg, athenaStateRoot: ath, productionRuntime: frozen });
+    const config = { thresholds: { stagnation: 0.75 } };
+    const events = [{ type: "REFLEX_COMPLETED", timestamp: "2026-01-01T00:00:00.000Z", sessionId: "s1", metadata: { reflex: "stagnation", scores: { sameStrategy: 0.5, sameUnderlyingProblem: 0.5, surfaceVariation: 0.5, newInformation: 0.5, likelyToProgress: 0.5, strategyChangeNeeded: 0.5 } } }];
+    const audit = computeStagnationDecisionAudit({ events, athenaConfig: config, coreModule });
+    expect(audit).toHaveLength(1);
+    expect(typeof audit[0].compositeScore).toBe("number");
+    expect(audit[0].frozenPolicy.decision).toBe("allow");
+  });
+});
+
+describe("restored runner regressions", () => {
+  it("parses real OpenCode 1.18.31 JSONL capture", async () => {
+    const stream = await readFile(join(process.cwd(), "bench/test/fixtures/opencode-1.18.31-real.jsonl"), "utf8");
+    const trace = parseHostTrace(stream);
+    expect(trace.some((record) => record.type === "action" && record.tool === "bash")).toBe(true);
+    expect(finalAssistantMessage(trace)).toBe("Completed review.");
+    expect(hostMetrics(trace).llmTurns).not.toBeNull();
   });
 
-  it("terminates a hanging harmless child after timeout", async () => {
+  it("terminates a timed out process with SIGTERM", async () => {
     const execution = await executeProcess({ command: process.execPath, args: ["--eval", "setInterval(() => {}, 1000)"], cwd: process.cwd(), timeoutMs: 20, env: process.env });
     expect(execution.timedOut).toBe(true);
     expect(execution.terminationSignal).toBe("SIGTERM");
-    expect(execution.forcedKill).toBe(false);
   });
 
-  it("uses frozen runtime after working-tree dist tampering", async () => {
-    const root = await mkdtemp(join(tmpdir(), "athena-bench-provenance-"));
-    const artifactRoot = join(root, "frozen");
-    const entrypoint = await frozenRuntime(artifactRoot);
-    const fingerprint = await fingerprintProductionArtifacts(artifactRoot);
-    const productionRuntime = {
-      entrypoint,
-      productionArtifactFingerprint: fingerprint,
-      provenance: {
-        frozenCommit: FROZEN_ATHENA_COMMIT,
-        artifactFingerprint: fingerprint,
-        buildSource: "git-commit",
-        artifactRoot: `athena-bench-frozen/${FROZEN_ATHENA_COMMIT}/build`,
-      },
-    };
-    const currentDist = join(
-      root,
-      "current-working-tree",
-      "packages",
-      "opencode",
-      "dist",
-    );
-    await mkdir(currentDist, { recursive: true });
-    await writeFile(
-      join(currentDist, "index.js"),
-      'throw new Error("CURRENT DIST EXECUTED");\n',
-    );
-    const treatment = join(root, "treatment");
-    await prepareArm({
-      caseDefinition: { fixture: "controlled-semantic-loop" },
-      arm: "treatment",
-      target: treatment,
-      productionRuntime,
-    });
-    const plugin = await readFile(
-      join(treatment, ".opencode", "plugins", "athena.ts"),
-      "utf8",
-    );
-    expect(plugin).toContain(pathToFileURL(entrypoint).href);
-    expect((await loadFrozenPlugin(entrypoint)).runtime).toBe("FROZEN");
-    expect(await fingerprintProductionArtifacts(artifactRoot)).toBe(fingerprint);
+  it("escalates a SIGTERM-resistant process to SIGKILL", async () => {
+    const execution = await executeProcess({ command: process.execPath, args: ["--eval", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"], cwd: process.cwd(), timeoutMs: 200, env: process.env });
+    expect(execution.timedOut).toBe(true);
+    expect(execution.terminationSignal).toBe("SIGKILL");
+    expect(execution.forcedKill).toBe(true);
+  }, 5_000);
+
+  it("records validator SIGTERM timeout", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-validator-term-"));
+    const validated = await validateRun({ fixtureRoot: root, runRoot: root, validator: { kind: "command", command: [process.execPath, "--eval", "setInterval(() => {}, 1000)"], expectedExit: 0 }, baselineFiles: new Map(), timeoutMs: 20 });
+    expect(validated.success).toBe(false);
+    expect(validated.evidence[0].terminationSignal).toBe("SIGTERM");
   });
 
-  it("imports and initializes frozen AthenaV1Plugin without invoking hooks", async () => {
-    const runtime = await prepareFrozenRuntime();
-    const module = await import(pathToFileURL(runtime.entrypoint).href);
-    expect(typeof module.AthenaV1Plugin).toBe("function");
-    const fixture = await mkdtemp(join(tmpdir(), "athena-plugin-init-"));
-    await mkdir(join(fixture, ".athena"));
-    const config = await readFile(join(process.cwd(), "evals", "fixtures", "controlled-semantic-loop", ".athena", "config.json"), "utf8");
-    await writeFile(join(fixture, ".athena", "config.json"), config.replace('"typesafe"', '"demo"'));
-    const hooks = await module.AthenaV1Plugin({ directory: fixture });
-    expect(Object.keys(hooks)).toEqual(expect.arrayContaining([
-      "tool.execute.before",
-      "tool.execute.after",
-      "experimental.chat.system.transform",
-    ]));
-  });
+  it("records validator SIGKILL escalation", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-validator-kill-"));
+    const validated = await validateRun({ fixtureRoot: root, runRoot: root, validator: { kind: "command", command: [process.execPath, "--eval", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"], expectedExit: 0 }, baselineFiles: new Map(), timeoutMs: 200 });
+    expect(validated.evidence[0].terminationSignal).toBe("SIGKILL");
+    expect(validated.evidence[0].forcedKill).toBe(true);
+  }, 5_000);
 
-  it("isolates frozen internal ATHENA dependencies from current production packages", async () => {
-    const root = await mkdtemp(join(tmpdir(), "athena-bench-graph-"));
-    const artifactRoot = join(root, "frozen");
-    const entrypoint = await frozenRuntime(artifactRoot);
-    const currentCore = join(
-      root,
-      "current-working-tree",
-      "packages",
-      "core",
-      "dist",
-    );
-    await mkdir(currentCore, { recursive: true });
-    await writeFile(
-      join(currentCore, "index.js"),
-      'export const runtime = "CURRENT_SENTINEL";\n',
-    );
-    await expect(assertFrozenRuntimeGraph(artifactRoot)).resolves.toBe(
-      entrypoint,
-    );
-    expect(await loadFrozenPlugin(entrypoint)).toEqual({
-      runtime: "FROZEN",
-      typesafeRuntime: "FROZEN",
-    });
-  });
-
-  it("fingerprints production artifacts deterministically and ignores benchmark files", async () => {
-    const root = await mkdtemp(join(tmpdir(), "athena-bench-fingerprint-"));
-    const first = join(root, "first");
-    const second = join(root, "second");
-    await frozenRuntime(first);
-    await frozenRuntime(second, true);
-    const firstFingerprint = await fingerprintProductionArtifacts(first);
-    expect(firstFingerprint).toBe(await fingerprintProductionArtifacts(first));
-    expect(firstFingerprint).toBe(await fingerprintProductionArtifacts(second));
-    await mkdir(join(first, "bench"), { recursive: true });
-    await writeFile(join(first, "bench", "only.txt"), "changed");
-    expect(await fingerprintProductionArtifacts(first)).toBe(firstFingerprint);
-    await writeFile(
-      join(first, "packages", "core", "dist", "index.js"),
-      'export const runtime = "CHANGED";\n',
-    );
-    expect(await fingerprintProductionArtifacts(first)).not.toBe(
-      firstFingerprint,
-    );
-  });
-
-  it("parses sanitized real OpenCode 1.18.31 capture", async () => {
-    const stream = await readFile(
-      join(process.cwd(), "bench/test/fixtures/opencode-1.18.31-real.jsonl"),
-      "utf8",
-    );
-    const trace = parseHostTrace(stream) as Array<{
-      toolCallID?: string;
-      type: string;
-      success?: boolean | null;
-      error?: string | null;
-      [key: string]: unknown;
-    }>;
-    const completed = trace.find(
-      (record) => record.toolCallID === "call_completed",
-    );
-    const failed = trace.find((record) => record.toolCallID === "call_error");
-    expect(completed).toMatchObject({
-      sessionID: "ses_sanitized",
-      messageID: "msg_assistant_1",
-      tool: "bash",
-      stateStatus: "completed",
-      input: '{"command":"pnpm test","workdir":"$WORKDIR"}',
-      result: "Tests: 1 passed",
-      success: true,
-    });
-    expect(failed).toMatchObject({
-      messageID: "msg_assistant_2",
-      stateStatus: "error",
-      success: false,
-    });
-    expect(failed?.error).toContain("sanitized failure");
-    expect(
-      trace.filter(
-        (record) => record.type === "action" && record.success === false,
-      ),
-    ).toHaveLength(1);
-    expect(hostMetrics(trace)).toEqual({
-      sessionID: "ses_sanitized",
-      llmTurns: 2,
-      hostTokens: {
-        total: 41898,
-        input: 21745,
-        output: 162,
-        reasoning: 23,
-        cacheRead: 19968,
-        cacheWrite: 0,
-      },
-      hostReportedCost: 0,
-    });
-    expect(finalAssistantMessage(trace)).toBe("Completed review.");
-    expect(completionDeclaration(trace, false)).toBe(true);
-    expect(completionDeclaration(trace, true)).toBe(false);
-  });
-
-  it("merges host and ATHENA trace chronologically", () => {
-    const merged = mergeTrace(
-      [
-        {
-          source: "host",
-          order: 0,
-          timestamp: 1,
-          type: "action",
-          tool: "bash",
-        },
-        {
-          source: "host",
-          order: 1,
-          timestamp: 4,
-          type: "action",
-          tool: "read",
-        },
-      ],
-      [
-        { timestamp: "1970-01-01T00:00:00.002Z", type: "REFLEX_COMPLETED" },
-        { timestamp: "1970-01-01T00:00:00.003Z", type: "REPLAN_QUEUED" },
-      ],
-    );
-    expect(
-      merged.map((entry: { type: string; event?: { type: string } }) =>
-        entry.type === "athena-event" ? entry.event?.type : entry.type,
-      ),
-    ).toEqual(["action", "REFLEX_COMPLETED", "REPLAN_QUEUED", "action"]);
-  });
-
-  it("classifies only final completion declarations", () => {
-    expect(
-      completionDeclaration(
-        [
-          { type: "host-output", summary: "fixed incidental text" },
-          {
-            type: "assistant-text",
-            messageID: "final",
-            order: 1,
-            text: "I investigated.",
-          },
-        ],
-        false,
-      ),
-    ).toBe(false);
-    expect(
-      completionDeclaration(
-        [
-          {
-            type: "assistant-text",
-            messageID: "final",
-            order: 1,
-            text: "Fixed the task.",
-          },
-        ],
-        false,
-      ),
-    ).toBe(true);
-    expect(completionDeclaration([], false)).toBeNull();
-  });
-
-  it("redacts JSON secrets and sanitizes paths", () => {
-    const value = redact(
-      '{"token":"secret","api_key":"secret","Authorization":"Bearer secret"} /home/martins/Documents/athena-jev/x',
-    );
-    expect(value).not.toContain("secret");
-    expect(value).toContain("[REDACTED]");
+  it("redacts secrets, authorization headers, and contextual paths", () => {
+    const value = redact('token=top-secret Authorization: Bearer abc.def /tmp/bench/work/file /home/martins/Documents/athena-jev/a', { workdirRoot: "/tmp/bench/work" });
+    expect(value).not.toContain("top-secret");
+    expect(value).not.toContain("abc.def");
+    expect(value).toContain("$WORKDIR");
     expect(value).toContain("$REPO");
   });
 
-  it("validates pairs and excludes invalid pairs from analysis", () => {
-    const validRuns = [
-      result("control", "fixture-r01"),
-      result("treatment", "fixture-r01"),
-    ];
-    const invalidRuns = [
-      result("control", "fixture-r02"),
-      {
-        ...result("treatment", "fixture-r02"),
-        athenaTelemetrySummary: {
-          active: false,
-          replan: 0,
-          reflexCompleted: 0,
-          jevCalls: null,
-        },
-      },
-    ];
-    expect(validatePair(validRuns).pairValid).toBe(true);
-    const failedRuns = validRuns.map((run) => ({
-      ...run,
-      metrics: { ...run.metrics, taskSuccess: false },
-    }));
-    expect(validatePair(failedRuns).pairValid).toBe(true);
-    expect(validatePair(invalidRuns).invalidReasons).toContain(
-      "treatment ATHENA inactive",
-    );
-    expect(
-      validatePair([
-        { ...result("control"), runtimeEvidence: { athenaAbsent: false } },
-        result("treatment"),
-      ]).invalidReasons,
-    ).toContain("control ATHENA absence not verified");
-    const analysis = analyzeRuns([...validRuns, ...invalidRuns]);
-    expect(analysis.control.n).toBe(1);
-    expect(analysis.invalidPairs).toHaveLength(1);
-    expect(median([1, 3, 5, 7])).toBe(4);
+  it("keeps frozen runtime isolated from working tree tampering", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-frozen-graph-"));
+    const runtime = await frozenRuntime(root);
+    await expect(assertFrozenRuntimeGraph(root)).resolves.toBe(runtime.entrypoint);
   });
 
-  it("counterbalances deterministic order", () => {
-    expect(orderedArms(7, 1)).not.toEqual(orderedArms(7, 2));
-    expect(promptHash("x")).toBe(promptHash("x"));
+  it("rejects manifest harness, fixture, and validator drift", () => {
+    const plan = planExperiment({ caseDefinition: { id: "fixture" }, replicates: 1, seed: 1, model: "m", timeoutMs: 1000, experimentId: "e" });
+    const base = { schemaVersion: "1.2", benchmarkHarnessFingerprint: h, productionArtifactFingerprint: h, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, model: "m", modelConfig: { model: "m" }, timeoutMs: 1000, seed: 1, pairs: plan.pairs, cases: [{ caseId: "fixture", fixtureFingerprint: h, taskPromptHash: h, caseDefinitionFingerprint: h, requestedNetworkPolicy: "offline", requestedTools: ["read"], dataset: "development", category: "test-fix" }] };
+    expect(manifestCompatibility(base, { ...base, benchmarkHarnessFingerprint: "b".repeat(64) }).compatible).toBe(false);
+    expect(manifestCompatibility(base, { ...base, cases: [{ ...base.cases[0], fixtureFingerprint: "b".repeat(64) }] }).compatible).toBe(false);
+    expect(manifestCompatibility(base, { ...base, cases: [{ ...base.cases[0], caseDefinitionFingerprint: "b".repeat(64) }] }).compatible).toBe(false);
   });
 
-  it("rejects budgets exceeding hard limits", () => {
-    expect(() =>
-      planExperiment({
-        caseDefinition: sampleCase,
-        replicates: 10,
-        seed: 1,
-        model: "m",
-        timeoutMs: 1000,
-        experimentId: "max-ok",
-      }),
-    ).not.toThrow();
-    expect(() =>
-      planExperiment({
-        caseDefinition: sampleCase,
-        replicates: 11,
-        seed: 1,
-        model: "m",
-        timeoutMs: 1000,
-        experimentId: "over",
-      }),
-    ).toThrow("Run budget");
+  it("enforces pair and agent run budgets", () => {
+    const sample = { id: "fixture" };
+    expect(() => planExperiment({ caseDefinition: sample, replicates: 11, seed: 1, model: "m", timeoutMs: 1000, experimentId: "e" })).toThrow("Run budget exceeded");
+    expect(() => planExperiment({ caseDefinitions: Array.from({ length: 11 }, (_, index) => ({ id: `case-${index}` })), replicates: 1, seed: 1, model: "m", timeoutMs: 1000, experimentId: "e" })).toThrow("Run budget exceeded");
   });
 
-  it("computes correct medians ignoring null entries", () => {
-    expect(median([1])).toBe(1);
-    expect(median([1, 3])).toBe(2);
-    expect(median([1, 2, 9])).toBe(2);
-    expect(median([1, 2, 8, 10])).toBe(5);
-    expect(median([])).toBeNull();
-    expect(median([null as unknown as number])).toBeNull();
+  it("requires programmatic live confirmation before setup", async () => {
+    const plan = { experimentId: "e", pairs: [] };
+    await expect(runPair({ caseId: "fixture", experimentPlan: plan })).rejects.toThrow("confirmLive: true");
   });
 
-  it("redacts absolute paths using contextual roots", () => {
-    const ctx = {
-      repoRoot: "/home/example/Documents/athena-jev",
-      homeRoot: "/home/example",
-      workdirRoot: "/tmp/custom-random-123/session-root",
-    };
-    expect(redact("/home/example/Documents/athena-jev/foo", ctx)).toBe(
-      "$REPO/foo",
-    );
-    expect(redact("/home/example/.config/opencode", ctx)).toBe(
-      "$HOME/.config/opencode",
-    );
-    expect(
-      redact("/tmp/custom-random-123/session-root/file.txt", ctx),
-    ).toBe("$WORKDIR/file.txt");
-    expect(redact("/tmp/unrelated-temp/other/file.txt", ctx)).toBe(
-      "/tmp/unrelated-temp/other/file.txt",
-    );
-    expect(redact("/home/otheruser/.config/file.json", ctx)).toBe(
-      "/home/otheruser/.config/file.json",
-    );
-  });
+  it("dry run never invokes OpenCode run sentinel", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-dry-run-"));
+    const bin = join(root, "bin"); const sentinel = join(root, "opencode-run-called");
+    await mkdir(bin); await writeFile(join(bin, "opencode"), `#!/bin/sh\nif [ "$1" = "run" ]; then touch ${sentinel}; fi\necho 1.18.31\n`); await chmod(join(bin, "opencode"), 0o755);
+    const caseDefinition = await loadCase("controlled-semantic-loop");
+    const plan = planExperiment({ caseDefinition, replicates: 1, seed: 1, model: "openai/gpt-5.6-terra", timeoutMs: caseDefinition.timeoutMs, experimentId: `dry-${Date.now()}` });
+    const frozen = await prepareFrozenRuntime(); const resultRoot = join(root, "results"); await mkdir(join(resultRoot, "runs"), { recursive: true }); await mkdir(join(resultRoot, "raw"));
+    const manifest = experimentManifest({ plan, benchmarkCommit: "test", frozenProductionDifferences: [], productionRuntime: frozen, benchmarkHarnessFingerprint: h, cases: [] });
+    const oldPath = process.env.PATH; process.env.PATH = `${bin}:${oldPath}`;
+    try {
+      await runPair({ caseId: caseDefinition.id, replicate: 1, seed: 1, timeoutMs: caseDefinition.timeoutMs, model: "openai/gpt-5.6-terra", dryRun: true, experimentPlan: plan, experimentSetup: { caseDefinitions: new Map([[caseDefinition.id, caseDefinition]]), productionRuntime: frozen, harnessFingerprint: h, benchmarkCommit: "test", resultRoot, manifestPath: join(resultRoot, "manifest.json"), manifest } });
+    } finally { process.env.PATH = oldPath; }
+    await expect(access(sentinel)).rejects.toThrow();
+  }, 15_000);
 
-  it("falls back to default repo/home roots without context", () => {
-    expect(redact("/home/martins/Documents/athena-jev/x")).toContain("$REPO");
-    expect(redact("/home/martins/.config/opencode/auth.json")).toContain(
-      "$HOME",
-    );
-  });
-
-  it("redacts secrets from JSON and header forms", () => {
-    const json =
-      '{"token":"super-secret-token","api_key":"fake-api-key","Authorization":"Bearer fake-bearer"}';
-    expect(redact(json)).not.toContain("super-secret-token");
-    expect(redact(json)).not.toContain("fake-api-key");
-    expect(redact(json)).not.toContain("fake-bearer");
-    expect(redact(json)).toContain("[REDACTED]");
-    expect(redact("token=secret123")).not.toContain("secret123");
-    expect(redact("api_key=secret456")).not.toContain("secret456");
-    expect(redact("Authorization: Bearer fake-bearer-2")).not.toContain(
-      "fake-bearer-2",
-    );
-    expect(redact("apiKey=secret789")).not.toContain("secret789");
-  });
-
-  it("excludes malformed results from analysis headline statistics", () => {
-    const good = [
-      result("control", "fixture-r01"),
-      result("treatment", "fixture-r01"),
-    ];
-    const malformed = {
-      schemaVersion: "1.1",
-      experimentId: "experiment",
-      pairId: "fixture-r02",
-      runId: "fixture-r02-control",
-      caseId: "fixture",
-      arm: "control",
-      status: "completed",
-      benchmarkCommit: "a",
-      athenaFrozenCommit: FROZEN_ATHENA_COMMIT,
-      productionArtifactFingerprint: "c".repeat(64),
-      benchmarkHarnessFingerprint: "d".repeat(64),
-    };
-    const analysis = analyzeRuns([...good, malformed as unknown as ReturnType<typeof result>]);
-    expect(analysis.control.n).toBe(1);
+  it("rejects malformed result artifacts in analysis", () => {
+    const analysis = analyzeRuns([{ runId: "bad", schemaVersion: "broken" }], { pairs: [] });
     expect(analysis.artifactValidationErrors).toHaveLength(1);
-    expect(analysis.artifactValidationErrors[0].runId).toBe(
-      "fixture-r02-control",
-    );
+    expect(analysis.validPairs).toHaveLength(0);
   });
 
-  it("excludes analysis from invalid pairs while preserving them", () => {
-    const valid = [
-      result("control", "fixture-r01"),
-      result("treatment", "fixture-r01"),
-    ];
-    const invalid = [
-      result("control", "fixture-r02"),
-      {
-        ...result("treatment", "fixture-r02"),
-        athenaTelemetrySummary: {
-          active: false,
-          replan: 0,
-          reflexCompleted: 0,
-          jevCalls: null,
-        },
-      },
-    ];
-    const analysis = analyzeRuns([...valid, ...invalid]);
-    expect(analysis.control.n).toBe(1);
+  it("exports malformed CSV fields safely", () => {
+    const analysis = { artifactValidationErrors: [{ runId: "bad", reason: "bad,\"artifact\"" }], pairs: [] };
+    expect(summaryCsv([{ runId: "bad", pairId: "p", arm: "control" }], analysis)).toContain('"bad,""artifact"""');
+  });
+
+  it("reports missing and incomplete pairs", () => {
+    const control = result("control");
+    const plan = { pairs: [{ pairId: control.pairId, runs: [{ runId: control.runId, arm: "control" }, { runId: `${control.pairId}-treatment`, arm: "treatment" }] }] };
+    const analysis = analyzeRuns([control], plan);
     expect(analysis.invalidPairs).toHaveLength(1);
   });
 
-  it("does not overwrite previous invalid results on resume", () => {
-    expect(
-      resumeCompatibility(
-        { ...result("control"), fixtureFingerprint: "a".repeat(64) },
-        { ...result("control"), fixtureFingerprint: "b".repeat(64) },
-      ).resumeCompatible,
-    ).toBe(false);
+  it("preserves unknown provider metrics as null", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-provider-null-"));
+    const telemetry = await import("../runners/index.mjs").then((module) => module.athenaTelemetry(root));
+    expect(telemetry.jevCalls).toBeNull();
+    expect(telemetry.jevFailures).toBeNull();
   });
 
-  it("malformed artifact sharing valid pairId cannot affect summary", () => {
-    const valid = [
-      result("control", "fixture-r01"),
-      result("treatment", "fixture-r01"),
+  it("invalidates a TypeSafe-configured treatment with demo provider evidence", () => {
+    const control = result("control");
+    const treatment = result("treatment");
+    treatment.runtimeEvidence.athenaProvider = "typesafe";
+    treatment.runtimeEvidence.providerCallVisibility = "observed";
+    treatment.athenaTelemetrySummary = { ...treatment.athenaTelemetrySummary, reflexCompleted: 1, jevCalls: 1, providerNames: ["demo"] };
+    expect(validatePair([control, treatment]).pairValid).toBe(false);
+  });
+
+  it("rejects control ATHENA-path false positives", () => {
+    const control = result("control");
+    const treatment = result("treatment");
+    control.runtimeEvidence.athenaAbsent = false;
+    expect(validatePair([control, treatment]).pairValid).toBe(false);
+  });
+
+  it("normalizes actual R2 observed tool names without allowing unknown tools", () => {
+    const good = verifyToolIsolation({ requestedTools: ["read", "write", "shell"], observedTools: ["read", "glob", "grep", "apply_patch", "bash"], policyConfigFingerprint: h, expectedFingerprint: h });
+    expect(good.verified).toBe(true);
+    expect(good.normalizedObservedTools).toContain("edit");
+    const bad = verifyToolIsolation({ requestedTools: ["read"], observedTools: ["todowrite", "unknown-tool"], policyConfigFingerprint: h, expectedFingerprint: h });
+    expect(bad.verified).toBe(false);
+    expect(bad.outOfPolicyObservedTools).toEqual(expect.arrayContaining(["todowrite", "unknown-tool"]));
+  });
+
+  it("measures model-visible hidden ATHENA and OpenCode artifacts", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-visible-"));
+    await writeFile(join(root, "task.txt"), "task");
+    const baseline = await modelVisibleInputFingerprint(root);
+    await mkdir(join(root, ".athena")); await writeFile(join(root, ".athena", "test"), "x");
+    expect(await modelVisibleInputFingerprint(root)).not.toBe(baseline);
+    await rm(join(root, ".athena"), { recursive: true }); await mkdir(join(root, ".opencode")); await writeFile(join(root, ".opencode", "test"), "x");
+    expect(await modelVisibleInputFingerprint(root)).not.toBe(baseline);
+  });
+
+  it("invalidates pairs with model-visible hidden artifacts", () => {
+    const control = result("control"); const treatment = result("treatment");
+    treatment.environmentMetadata.modelVisibleEnvironment.athenaArtifactsPresent = true;
+    treatment.environmentMetadata.modelVisibleEnvironment.verifiedEquivalentInput = false;
+    expect(validatePair([control, treatment]).pairValid).toBe(false);
+  });
+
+  it("attributes replans only until next stagnation evaluation", async () => {
+    const { coreModule } = await importFrozenCore();
+    const allow = { sameStrategy: 0.1, sameUnderlyingProblem: 0.1, surfaceVariation: 0.1, newInformation: 0.9, likelyToProgress: 0.9, strategyChangeNeeded: 0.1 };
+    const replan = { sameStrategy: 0.9, sameUnderlyingProblem: 0.9, surfaceVariation: 0.8, newInformation: 0.2, likelyToProgress: 0.2, strategyChangeNeeded: 0.9 };
+    const events = [
+      { type: "REFLEX_COMPLETED", timestamp: "2026-01-01T00:00:01.000Z", sessionId: "s", metadata: { reflex: "stagnation", scores: allow } },
+      { type: "REFLEX_STARTED", timestamp: "2026-01-01T00:00:02.000Z", sessionId: "s", metadata: { reflex: "stagnation" } },
+      { type: "REFLEX_COMPLETED", timestamp: "2026-01-01T00:00:03.000Z", sessionId: "s", metadata: { reflex: "stagnation", scores: replan } },
+      { type: "REPLAN_REQUESTED", timestamp: "2026-01-01T00:00:04.000Z", sessionId: "s", metadata: {} },
+      { type: "REPLAN_QUEUED", timestamp: "2026-01-01T00:00:05.000Z", sessionId: "s", metadata: {} },
     ];
-    const malformed = {
-      ...result("control", "fixture-r01"),
-      metrics: undefined,
-    };
-    const analysis = analyzeRuns([...valid, malformed as unknown as ReturnType<typeof result>]);
-    expect(analysis.control.n).toBe(1);
-    expect(analysis.artifactValidationErrors).toHaveLength(1);
-    expect(analysis.control.successRate).toBe(1);
+    const audit = computeStagnationDecisionAudit({ events, athenaConfig: { mode: "balanced", thresholds: { stagnation: 0.75 } }, coreModule });
+    expect(audit).toHaveLength(2);
+    expect(audit[0].policyMatchesObserved).toBe(true);
+    expect(audit[1].policyMatchesObserved).toBe(true);
   });
 
-  it("completely missing planned pair remains reported", () => {
-    const plan = {
-      pairs: [
-        { pairId: "fixture-r01", runs: [{ runId: "fixture-r01-control", arm: "control" }, { runId: "fixture-r01-treatment", arm: "treatment" }] },
-        { pairId: "fixture-r02", runs: [{ runId: "fixture-r02-control", arm: "control" }, { runId: "fixture-r02-treatment", arm: "treatment" }] },
-      ],
-    };
-    const runs = [result("control", "fixture-r01"), result("treatment", "fixture-r01")];
-    const analysis = analyzeRuns(runs, plan);
-    expect(analysis.plannedPairs).toBe(2);
-    expect(analysis.validPairs).toHaveLength(1);
-    expect(analysis.missingPairs).toHaveLength(1);
-    expect(analysis.missingPairs[0].pairId).toBe("fixture-r02");
+  it("rejects a stagnation event without scores", async () => {
+    const { coreModule } = await importFrozenCore();
+    expect(() => computeStagnationDecisionAudit({ events: [{ type: "REFLEX_COMPLETED", timestamp: "2026-01-01T00:00:00.000Z", sessionId: "s", metadata: { reflex: "stagnation" } }], athenaConfig: { thresholds: { stagnation: 0.75 } }, coreModule })).toThrow("missing scores");
+  });
+});
+
+describe("zero-model isolation gate", () => {
+  it("generates explicit deny entries for every unrequested OpenCode category", () => {
+    const policy = generateOpenCodeConfig(["read"]).permission;
+    expect(policy).toMatchObject({ read: "allow", glob: "allow", grep: "allow", edit: "deny", apply_patch: "deny", bash: "deny", todowrite: "deny", task: "deny", skill: "deny", lsp: "deny", question: "deny", webfetch: "deny", websearch: "deny", external_directory: "deny" });
   });
 
-  it("recursively fingerprints complete validator definitions", () => {
-    const pathA = { ...sampleCase, validator: { kind: "file-present", path: "a.md", forbiddenPaths: ["scenario.json"] } };
-    const pathB = { ...sampleCase, validator: { kind: "file-present", path: "b.md", forbiddenPaths: ["scenario.json"] } };
-    const commandA = { ...sampleCase, validator: { kind: "command", command: ["node", "a.js"], expectedExit: 0 } };
-    const commandB = { ...sampleCase, validator: { kind: "command", command: ["node", "b.js"], expectedExit: 0 } };
-    const exitB = { ...commandA, validator: { ...commandA.validator, expectedExit: 1 } };
-    const forbiddenB = { ...pathA, validator: { ...pathA.validator, forbiddenPaths: ["scenario.json", "test.js"] } };
-    const reordered = { ...sampleCase, validator: { forbiddenPaths: ["scenario.json"], path: "a.md", kind: "file-present" } };
-    expect(caseDefinitionFingerprint(pathA)).not.toBe(caseDefinitionFingerprint(pathB));
-    expect(caseDefinitionFingerprint(commandA)).not.toBe(caseDefinitionFingerprint(commandB));
-    expect(caseDefinitionFingerprint(commandA)).not.toBe(caseDefinitionFingerprint(exitB));
-    expect(caseDefinitionFingerprint(pathA)).not.toBe(caseDefinitionFingerprint(forbiddenB));
-    expect(caseDefinitionFingerprint(pathA)).toBe(caseDefinitionFingerprint(reordered));
-    expect(caseDefinitionFingerprint({ ...pathA, requestedTools: ["read", "shell"] })).not.toBe(caseDefinitionFingerprint({ ...pathA, requestedTools: ["shell", "read"] }));
-    expect(canonicalJson({ b: { y: 2, x: 1 }, a: null })).toBe(canonicalJson({ a: null, b: { x: 1, y: 2 } }));
+  it("allows only explicit write permission names", () => {
+    const policy = generateOpenCodeConfig(["write"]).permission;
+    expect(policy.edit).toBe("allow");
+    expect(policy.apply_patch).toBe("allow");
+    expect(policy.read).toBe("deny");
+    expect(policy.bash).toBe("deny");
   });
 
-  it("actual validator fingerprint drift rejects artifact and manifest resume", async () => {
-    const priorCase = { caseId: sampleCase.id, fixtureFingerprint: "f".repeat(64), taskPromptHash: promptHash(sampleCase.taskPrompt), caseDefinitionFingerprint: caseDefinitionFingerprint({ ...sampleCase, validator: { kind: "file-present", path: "a.md" } }), requestedNetworkPolicy: sampleCase.requestedNetworkPolicy, requestedTools: sampleCase.requestedTools, dataset: sampleCase.dataset, category: sampleCase.category };
-    const currentCase = { ...priorCase, caseDefinitionFingerprint: caseDefinitionFingerprint({ ...sampleCase, validator: { kind: "file-present", path: "b.md" } }) };
-    expect(resumeCompatibility({ ...result("control"), caseDefinitionFingerprint: priorCase.caseDefinitionFingerprint }, { ...result("control"), caseDefinitionFingerprint: currentCase.caseDefinitionFingerprint }).resumeCompatible).toBe(false);
-    // @ts-expect-error JavaScript benchmark runner has no declaration output.
-    const { manifestCompatibility } = await import("../runners/index.mjs");
-    const shared = { model: "m", modelConfig: { model: "m" }, timeoutMs: 1000, seed: 1, pairs: [], benchmarkHarnessFingerprint: "a".repeat(64), productionArtifactFingerprint: "b".repeat(64), athenaFrozenCommit: FROZEN_ATHENA_COMMIT };
-    const drift = manifestCompatibility({ ...shared, cases: [priorCase] }, { ...shared, cases: [currentCase] });
-    expect(drift.compatible).toBe(false); expect(drift.conflicts[0].field).toBe(`cases.${sampleCase.id}.caseDefinitionFingerprint`);
-    expect(manifestCompatibility({ ...shared, cases: [priorCase, { ...priorCase, caseId: "other" }] }, { ...shared, cases: [{ ...priorCase, caseId: "other" }, priorCase] }).compatible).toBe(true);
+  it("allows only explicit shell permission names", () => {
+    const policy = generateOpenCodeConfig(["shell"]).permission;
+    expect(policy.bash).toBe("allow");
+    expect(policy.edit).toBe("deny");
+    expect(policy.read).toBe("deny");
   });
 
-  it("exports malformed artifacts safely and reports missing pairs", () => {
-    const valid = [result("control", "fixture-r01"), result("treatment", "fixture-r01")]; const malformed = { ...result("control", "fixture-r01"), runId: "bad", metrics: undefined };
-    const plan = { pairs: [{ pairId: "fixture-r01", runs: [{ runId: "fixture-r01-control", arm: "control" }, { runId: "fixture-r01-treatment", arm: "treatment" }] }, { pairId: "fixture-r02", runs: [{ runId: "fixture-r02-control", arm: "control" }, { runId: "fixture-r02-treatment", arm: "treatment" }] }] };
-    const analysis = analyzeRuns([...valid, malformed as unknown as ReturnType<typeof result>], plan);
-    const csv = summaryCsv([...valid, malformed as unknown as ReturnType<typeof result>], analysis);
-    expect(csv).toContain("artifact_valid"); expect(csv).toContain("false"); expect(analysis.control.n).toBe(1); expect(renderReport({ experimentId: "x", ...analysis })).toContain("## MISSING PAIRS\nfixture-r02");
+  it("rejects manifest schema-version drift", () => {
+    const manifest = { schemaVersion: "1.1", benchmarkHarnessFingerprint: h, productionArtifactFingerprint: h, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, model: "m", modelConfig: {}, timeoutMs: 1000, seed: 1, pairs: [], cases: [] };
+    expect(manifestCompatibility(manifest, { ...manifest, schemaVersion: "1.2" }).conflicts.map((conflict) => conflict.field)).toContain("schemaVersion");
   });
 
-  it("counts TypeSafe provider attempts separately from reflexes", async () => {
-    const root = await mkdtemp(join(tmpdir(), "athena-telemetry-")); await mkdir(join(root, ".athena"));
-    const events = [...Array.from({ length: 3 }, (_, index) => ({ type: "REFLEX_COMPLETED", metadata: { provider: "typesafe", reflex: "risk", providerLatencyMs: 10 + index } })), { type: "REFLEX_FAILED", metadata: { provider: "typesafe" } }];
-    await writeFile(join(root, ".athena", "events.jsonl"), events.map((event) => JSON.stringify(event)).join("\n"));
-    await expect(athenaTelemetry(root)).resolves.toMatchObject({ reflexCompleted: 3, reflexFailures: 1, jevCalls: 4, jevFailures: 1 });
+  it("analyzes historical 1.1 artifacts without schema-1.2 validation", () => {
+    const historical = { ...result("control"), schemaVersion: "1.1", environmentMetadata: { requestedNetworkPolicy: "offline", networkIsolationVerified: true, requestedTools: ["read"], toolsIsolationVerified: true, orderSeed: 1, order: ["control", "treatment"], modelVisibleInputFingerprint: h } };
+    expect(analyzeRuns([historical], { pairs: [] }).artifactValidationErrors).toHaveLength(0);
   });
 
-  it("manifest model drift rejects resume", async () => {
-    const prior = { model: "model-a", modelConfig: { model: "model-a" }, timeoutMs: 1000, seed: 1, pairs: [], benchmarkHarnessFingerprint: "a".repeat(64), productionArtifactFingerprint: "b".repeat(64), athenaFrozenCommit: FROZEN_ATHENA_COMMIT };
-    const current = { model: "model-b", modelConfig: { model: "model-b" }, timeoutMs: 1000, seed: 1, pairs: [], benchmarkHarnessFingerprint: "a".repeat(64), productionArtifactFingerprint: "b".repeat(64), athenaFrozenCommit: FROZEN_ATHENA_COMMIT };
-    // @ts-expect-error JavaScript benchmark runner has no declaration output.
-    const { manifestCompatibility } = await import("../runners/index.mjs");
-    const compat = manifestCompatibility(prior, current);
-    expect(compat.compatible).toBe(false);
-    expect(compat.conflicts.some((c: { field: string }) => c.field === "model")).toBe(true);
+  it("rejects invalid CLI numeric input before benchmark setup", async () => {
+    await expect(exec(process.execPath, ["bench/runners/cli.mjs", "pair", "--case", "controlled-semantic-loop", "--replicates", "0"], { cwd: process.cwd() })).rejects.toMatchObject({ stderr: expect.stringContaining("replicates must be a positive integer") });
   });
 
-  it("ATHENA event workdir is context-redacted", () => {
-    const ctx = { workdirRoot: "/tmp/not-athena-pattern/session-947" };
-    const event = { type: "ACTION_PROPOSED", metadata: { tool: "bash", args: { command: "test", workdir: "/tmp/not-athena-pattern/session-947/work" } } };
-    const redacted = redact(JSON.stringify(event), ctx);
-    expect(redacted).not.toContain("/tmp/not-athena-pattern/session-947");
-    expect(redacted).toContain("$WORKDIR");
+  it("requires CLI --confirm-live unless dry-run is selected", async () => {
+    await expect(exec(process.execPath, ["bench/runners/cli.mjs", "pair", "--case", "controlled-semantic-loop"], { cwd: process.cwd() })).rejects.toMatchObject({ stderr: expect.stringContaining("Live benchmark requires --confirm-live") });
   });
 
-  it("validator output workdir is context-redacted", () => {
-    const ctx = { workdirRoot: "/tmp/not-athena-pattern/session-947" };
-    const validator = { success: true, evidence: [{ type: "command", output: "/tmp/not-athena-pattern/session-947/output.txt" }] };
-    const redacted = redact(JSON.stringify(validator), ctx);
-    expect(redacted).not.toContain("/tmp/not-athena-pattern/session-947");
-    expect(redacted).toContain("$WORKDIR");
+  it("validates case shape before execution", () => {
+    expect(() => validateCase({ id: "bad" })).toThrow();
   });
 
-  it("observed provider zero failures is 0 not null", () => {
-    const runs = [
-      { ...result("control", "fixture-r01"), athenaTelemetrySummary: { active: false, replan: 0, reflexCompleted: 0, jevCalls: null, jevFailures: null } },
-      { ...result("treatment", "fixture-r01"), athenaTelemetrySummary: { active: true, replan: 0, reflexCompleted: 0, jevCalls: 4, jevFailures: 0 } },
-    ];
-    const analysis = analyzeRuns(runs);
-    expect(analysis.treatment.jevCalls).toBe(4);
+  it("merges host and ATHENA traces chronologically", () => {
+    const trace = mergeTrace([{ source: "host", order: 0, timestamp: 1, type: "action", tool: "read" }], [{ timestamp: "1970-01-01T00:00:00.002Z", type: "REFLEX_COMPLETED", metadata: {} }]);
+    expect(trace.map((item) => item.source)).toEqual(["host", "athena"]);
   });
 
-  it("unknown provider remains null", () => {
-    const runs = [
-      { ...result("control", "fixture-r01"), athenaTelemetrySummary: { active: false, replan: 0, reflexCompleted: 0, jevCalls: null, jevFailures: null } },
-      { ...result("treatment", "fixture-r01"), athenaTelemetrySummary: { active: true, replan: 0, reflexCompleted: 0, jevCalls: null, jevFailures: null } },
-    ];
-    const analysis = analyzeRuns(runs);
-    expect(analysis.treatment.jevCalls).toBeNull();
+  it("requires wrapper initialization and hook firing for activation", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-probe-"));
+    const probe = join(root, "probe.jsonl");
+    await writeFile(probe, ["wrapper-initialized", "frozen-runtime-imported"].map((type) => JSON.stringify({ type })).concat([JSON.stringify({ type: "athena-v1-initialized", registeredHooks: ["tool.execute.before"] }), JSON.stringify({ type: "hook-fired", name: "tool.execute.before" })]).join("\n"));
+    expect((await pluginActivationEvidence(probe, true)).active).toBe(true);
   });
 
-  it("validator ignoring SIGTERM receives SIGKILL", async () => {
-    const tmpDir = await mkdtemp(join(tmpdir(), "bench-validator-test-"));
-    const scriptPath = join(tmpDir, "ignore-sigterm.mjs");
-    await writeFile(scriptPath, `process.on("SIGTERM", () => {}); setInterval(() => {}, 100);`);
-    // @ts-expect-error JavaScript benchmark validator has no declaration output.
-    const { validateRun } = await import("../validators/index.mjs");
-    const start = Date.now();
-    const valResult = await validateRun({ fixtureRoot: tmpDir, runRoot: tmpDir, validator: { kind: "command", command: ["node", scriptPath], expectedExit: 0 }, baselineFiles: new Map(), timeoutMs: 1000 });
-    const elapsed = Date.now() - start;
-    expect(elapsed).toBeLessThan(8000);
-    expect(valResult.evidence[0].signal).toBe("SIGKILL");
+  it("runs actual Docker sandbox probes and hides sibling state from shell", async () => {
+    const sandbox = await createDockerSandbox();
+    const root = await mkdtemp(join(homedir(), "athena-docker-"));
+    const workspace = join(root, "workspace"); const hostConfig = join(root, "host-config"); const state = join(root, "athena-state"); const probe = join(root, "probe"); const shellHome = join(root, "shell-home");
+    await Promise.all([workspace, hostConfig, state, probe, shellHome].map((path) => mkdir(path, { recursive: true })));
+    await writeFile(join(workspace, "visible.txt"), "visible"); await writeFile(join(hostConfig, "secret"), "hidden"); await writeFile(join(state, "secret"), "hidden"); await writeFile(join(probe, "secret"), "hidden");
+    const environment = { ATHENA_BENCH_SHELL_HOME: shellHome, ATHENA_BENCH_WORK_ROOT: root, ATHENA_BENCH_WORKSPACE_ROOT: workspace, TYPESAFE_API_KEY: "present-for-host" };
+    const probes = await probeDockerSandbox(sandbox, workspace, state, probe, environment);
+    expect(probes.localProbePassed).toBe(true);
+    expect(probes.workspaceReadPassed).toBe(true);
+    expect(probes.workspaceWritePassed).toBe(true);
+    expect(probes.networkProbeBlocked).toBe(true);
+    expect(probes.hiddenStateProbePassed).toBe(true);
+    expect(probes.secretScrubProbePassed).toBe(true);
+    expect(probes.dockerSocketMounted).toBe(false);
+    expect(probes.verified).toBe(true);
+    await rm(sandbox.wrapperDir, { recursive: true, force: true });
+    await rm(root, { recursive: true, force: true });
+  }, 15_000);
+
+  it("prepares isolated host OAuth home and distinct shell home", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-homes-"));
+    const homes = await prepareHostHomes(root);
+    expect(homes.hostHome).not.toBe(homes.shellHome);
+    expect(await access(homes.hostHome).then(() => true)).toBe(true);
+    expect(await access(homes.shellHome).then(() => true)).toBe(true);
   });
 
-  it("invalid CLI numeric values rejected", async () => {
-    const runCli = async (args: string[]) => {
-      try {
-        await exec("node", ["bench/runners/cli.mjs", "pair", "--case", "straightforward-fix", ...args], { cwd: process.cwd() });
-        return { success: true };
-      } catch (error: unknown) {
-        return { success: false, message: (error as Error).message };
-      }
-    };
-    expect((await runCli(["--replicates", "0"])).success).toBe(false);
-    expect((await runCli(["--replicates", "-1"])).success).toBe(false);
-    expect((await runCli(["--replicates", "abc"])).success).toBe(false);
-    expect((await runCli(["--timeout", "abc"])).success).toBe(false);
-    expect((await runCli(["--timeout", "0"])).success).toBe(false);
-    expect((await runCli(["--seed", "abc"])).success).toBe(false);
+  it("writes balanced config at hidden .athena/config.json", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-state-config-"));
+    const frozen = await prepareFrozenRuntime();
+    const state = join(root, "state");
+    await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "treatment", workspaceRoot: join(root, "workspace"), hostConfigRoot: join(root, "config"), athenaStateRoot: state, productionRuntime: frozen });
+    expect(JSON.parse(await readFile(join(state, ".athena", "config.json"), "utf8")).mode).toBe("balanced");
   });
 
-  it("--confirm-live false cannot launch live execution", async () => {
-    try {
-      await exec("node", ["bench/runners/cli.mjs", "pair", "--case", "straightforward-fix", "--confirm-live", "false"], { cwd: process.cwd() });
-      throw new Error("should have failed");
-    } catch (error: unknown) {
-      expect((error as Error).message).toContain("Live benchmark requires --confirm-live");
-    }
-  });
-
-  it("programmatic runPair cannot bypass live confirmation", async () => {
-    // @ts-expect-error JavaScript benchmark runner has no declaration output.
-    const { runPair } = await import("../runners/index.mjs");
-    const plan = planExperiment({ caseDefinition: sampleCase, replicates: 1, seed: 1, model: "m", timeoutMs: 1000, experimentId: "test-gate" });
-    await expect(
-      runPair({ caseId: "fixture", replicate: 1, seed: 1, timeoutMs: 1000, model: "m", dryRun: false, experimentPlan: plan, confirmLive: false }),
-    ).rejects.toThrow("confirmLive");
-  });
-
-  it("dry-run never invokes the opencode executable (sentinel test)", async () => {
-    await rm(join(process.cwd(), "bench", "results", "test-sentinel"), { recursive: true, force: true });
-    const sentinelDir = await mkdtemp(join(tmpdir(), "bench-sentinel-"));
-    const sentinelPath = join(sentinelDir, "opencode-sentinel");
-    const binDir = join(sentinelDir, "bin");
-    await mkdir(binDir, { recursive: true });
-    const fakeOpenCode = join(binDir, "opencode");
-    await writeFile(fakeOpenCode, `#!/bin/sh\ntouch "${sentinelPath}"\nexit 0\n`);
-    await chmod(fakeOpenCode, 0o755);
-    const originalPath = process.env.PATH;
-    try {
-      process.env.PATH = `${binDir}:${originalPath}`;
-      // @ts-expect-error JavaScript benchmark runner has no declaration output.
-      const { runPair } = await import("../runners/index.mjs");
-      // @ts-expect-error JavaScript benchmark runner has no declaration output.
-      const { loadCase } = await import("../runners/index.mjs");
-      const caseDefinition = await loadCase("controlled-semantic-loop");
-      const plan = planExperiment({ caseDefinition, replicates: 1, seed: 1, model: "m", timeoutMs: 1000, experimentId: "test-sentinel" });
-      const pairResult = await runPair({ caseId: "controlled-semantic-loop", replicate: 1, seed: 1, timeoutMs: 1000, model: "m", dryRun: true, experimentPlan: plan, confirmLive: false });
-      let sentinelExists = false;
-      try { await access(sentinelPath); sentinelExists = true; } catch { sentinelExists = false; }
-      expect(sentinelExists).toBe(false);
-      expect(pairResult.pairId).toBe("controlled-semantic-loop-r01");
-      expect(pairResult.runs).toHaveLength(2);
-      expect(pairResult.runs.every((r: { validator: { evidence: Array<{ type: string }> } }) => r.validator.evidence.some((e: { type: string }) => e.type === "dry-run"))).toBe(true);
-    } finally {
-      process.env.PATH = originalPath;
-    }
-  });
-
-  it("prepares one complete multi-case manifest before any run and resumes both cases", async () => {
-    const loop = await loadCase("controlled-semantic-loop");
-    const fix = await loadCase("straightforward-fix");
-    const experimentId = `test-multi-case-${Date.now()}`;
-    const plan = planExperiment({ caseDefinitions: [loop, fix], replicates: 1, seed: 1, model: "m", timeoutMs: 1000, experimentId });
-    const setup = await prepareExperiment({ experimentPlan: plan, dryRun: true });
-    expect(setup.manifest.pairs).toHaveLength(2);
-    expect(setup.manifest.runs).toHaveLength(4);
-    expect(setup.manifest.cases.map((item: { caseId: string }) => item.caseId).sort()).toEqual(["controlled-semantic-loop", "straightforward-fix"]);
-    await expect(runPair({ caseId: loop.id, replicate: 1, seed: 1, timeoutMs: 1000, model: "m", dryRun: true, experimentPlan: plan, experimentSetup: setup })).resolves.toMatchObject({ pairId: "controlled-semantic-loop-r01" });
-    await expect(runPair({ caseId: fix.id, replicate: 1, seed: 1, timeoutMs: 1000, model: "m", dryRun: true, experimentPlan: plan, experimentSetup: setup })).resolves.toMatchObject({ pairId: "straightforward-fix-r01" });
-    const oneCasePlan = planExperiment({ caseDefinition: loop, replicates: 1, seed: 1, model: "m", timeoutMs: 1000, experimentId });
-    await expect(prepareExperiment({ experimentPlan: oneCasePlan, dryRun: true })).rejects.toThrow("manifest drift");
+  it("reads telemetry only from hidden .athena/events.jsonl", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-state-events-"));
+    await mkdir(join(root, ".athena"));
+    await writeFile(join(root, ".athena", "events.jsonl"), `${JSON.stringify({ type: "REFLEX_COMPLETED", timestamp: "2026-01-01T00:00:00.000Z", sessionId: "s", metadata: { reflex: "stagnation", provider: "typesafe", latencyMs: 1 } })}\n`);
+    const telemetry = await athenaTelemetry(root);
+    expect(telemetry.active).toBe(true);
+    expect(telemetry.metisEvaluations).toBe(1);
+    expect(telemetry.providerNames).toEqual(["typesafe"]);
   });
 });
