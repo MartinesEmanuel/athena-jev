@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mkdtemp, mkdir, readFile, symlink, writeFile, chmod, access } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, symlink, writeFile, chmod, access, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -10,7 +10,10 @@ import {
   assertFrozenProduction,
   assertFrozenRuntimeGraph,
   assertResumeCompatible,
+  athenaTelemetry,
   benchmarkHarnessFingerprint,
+  canonicalJson,
+  caseDefinitionFingerprint,
   completionDeclaration,
   executeProcess,
   finalAssistantMessage,
@@ -35,7 +38,9 @@ import {
   // @ts-expect-error JavaScript benchmark runner has no declaration output.
 } from "../runners/index.mjs";
 // @ts-expect-error JavaScript benchmark analysis has no declaration output.
-import { analyzeRuns, median } from "../analysis/summary.mjs";
+import { analyzeRuns, median, summaryCsv } from "../analysis/summary.mjs";
+// @ts-expect-error JavaScript benchmark report has no declaration output.
+import { renderReport } from "../analysis/report.mjs";
 
 const sampleCase = {
   id: "fixture",
@@ -778,11 +783,48 @@ describe("benchmark harness", () => {
     expect(analysis.missingPairs[0].pairId).toBe("fixture-r02");
   });
 
-  it("validator definition change rejects resume", () => {
-    const stored = { ...result("control"), caseDefinitionFingerprint: "a".repeat(64) };
-    const current = { ...result("control"), caseDefinitionFingerprint: "b".repeat(64) };
-    expect(resumeCompatibility(stored, current).resumeCompatible).toBe(false);
-    expect(resumeCompatibility(stored, current).fields[0].field).toBe("caseDefinitionFingerprint");
+  it("recursively fingerprints complete validator definitions", () => {
+    const pathA = { ...sampleCase, validator: { kind: "file-present", path: "a.md", forbiddenPaths: ["scenario.json"] } };
+    const pathB = { ...sampleCase, validator: { kind: "file-present", path: "b.md", forbiddenPaths: ["scenario.json"] } };
+    const commandA = { ...sampleCase, validator: { kind: "command", command: ["node", "a.js"], expectedExit: 0 } };
+    const commandB = { ...sampleCase, validator: { kind: "command", command: ["node", "b.js"], expectedExit: 0 } };
+    const exitB = { ...commandA, validator: { ...commandA.validator, expectedExit: 1 } };
+    const forbiddenB = { ...pathA, validator: { ...pathA.validator, forbiddenPaths: ["scenario.json", "test.js"] } };
+    const reordered = { ...sampleCase, validator: { forbiddenPaths: ["scenario.json"], path: "a.md", kind: "file-present" } };
+    expect(caseDefinitionFingerprint(pathA)).not.toBe(caseDefinitionFingerprint(pathB));
+    expect(caseDefinitionFingerprint(commandA)).not.toBe(caseDefinitionFingerprint(commandB));
+    expect(caseDefinitionFingerprint(commandA)).not.toBe(caseDefinitionFingerprint(exitB));
+    expect(caseDefinitionFingerprint(pathA)).not.toBe(caseDefinitionFingerprint(forbiddenB));
+    expect(caseDefinitionFingerprint(pathA)).toBe(caseDefinitionFingerprint(reordered));
+    expect(caseDefinitionFingerprint({ ...pathA, requestedTools: ["read", "shell"] })).not.toBe(caseDefinitionFingerprint({ ...pathA, requestedTools: ["shell", "read"] }));
+    expect(canonicalJson({ b: { y: 2, x: 1 }, a: null })).toBe(canonicalJson({ a: null, b: { x: 1, y: 2 } }));
+  });
+
+  it("actual validator fingerprint drift rejects artifact and manifest resume", async () => {
+    const priorCase = { caseId: sampleCase.id, fixtureFingerprint: "f".repeat(64), taskPromptHash: promptHash(sampleCase.taskPrompt), caseDefinitionFingerprint: caseDefinitionFingerprint({ ...sampleCase, validator: { kind: "file-present", path: "a.md" } }), requestedNetworkPolicy: sampleCase.requestedNetworkPolicy, requestedTools: sampleCase.requestedTools, dataset: sampleCase.dataset, category: sampleCase.category };
+    const currentCase = { ...priorCase, caseDefinitionFingerprint: caseDefinitionFingerprint({ ...sampleCase, validator: { kind: "file-present", path: "b.md" } }) };
+    expect(resumeCompatibility({ ...result("control"), caseDefinitionFingerprint: priorCase.caseDefinitionFingerprint }, { ...result("control"), caseDefinitionFingerprint: currentCase.caseDefinitionFingerprint }).resumeCompatible).toBe(false);
+    // @ts-expect-error JavaScript benchmark runner has no declaration output.
+    const { manifestCompatibility } = await import("../runners/index.mjs");
+    const shared = { model: "m", modelConfig: { model: "m" }, timeoutMs: 1000, seed: 1, pairs: [], benchmarkHarnessFingerprint: "a".repeat(64), productionArtifactFingerprint: "b".repeat(64), athenaFrozenCommit: FROZEN_ATHENA_COMMIT };
+    const drift = manifestCompatibility({ ...shared, cases: [priorCase] }, { ...shared, cases: [currentCase] });
+    expect(drift.compatible).toBe(false); expect(drift.conflicts[0].field).toBe(`cases.${sampleCase.id}.caseDefinitionFingerprint`);
+    expect(manifestCompatibility({ ...shared, cases: [priorCase, { ...priorCase, caseId: "other" }] }, { ...shared, cases: [{ ...priorCase, caseId: "other" }, priorCase] }).compatible).toBe(true);
+  });
+
+  it("exports malformed artifacts safely and reports missing pairs", () => {
+    const valid = [result("control", "fixture-r01"), result("treatment", "fixture-r01")]; const malformed = { ...result("control", "fixture-r01"), runId: "bad", metrics: undefined };
+    const plan = { pairs: [{ pairId: "fixture-r01", runs: [{ runId: "fixture-r01-control", arm: "control" }, { runId: "fixture-r01-treatment", arm: "treatment" }] }, { pairId: "fixture-r02", runs: [{ runId: "fixture-r02-control", arm: "control" }, { runId: "fixture-r02-treatment", arm: "treatment" }] }] };
+    const analysis = analyzeRuns([...valid, malformed as unknown as ReturnType<typeof result>], plan);
+    const csv = summaryCsv([...valid, malformed as unknown as ReturnType<typeof result>], analysis);
+    expect(csv).toContain("artifact_valid"); expect(csv).toContain("false"); expect(analysis.control.n).toBe(1); expect(renderReport({ experimentId: "x", ...analysis })).toContain("## MISSING PAIRS\nfixture-r02");
+  });
+
+  it("counts TypeSafe provider attempts separately from reflexes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-telemetry-")); await mkdir(join(root, ".athena"));
+    const events = [...Array.from({ length: 3 }, (_, index) => ({ type: "REFLEX_COMPLETED", metadata: { provider: "typesafe", reflex: "risk", providerLatencyMs: 10 + index } })), { type: "REFLEX_FAILED", metadata: { provider: "typesafe" } }];
+    await writeFile(join(root, ".athena", "events.jsonl"), events.map((event) => JSON.stringify(event)).join("\n"));
+    await expect(athenaTelemetry(root)).resolves.toMatchObject({ reflexCompleted: 3, reflexFailures: 1, jevCalls: 4, jevFailures: 1 });
   });
 
   it("manifest model drift rejects resume", async () => {
@@ -878,6 +920,7 @@ describe("benchmark harness", () => {
   });
 
   it("dry-run never invokes the opencode executable (sentinel test)", async () => {
+    await rm(join(process.cwd(), "bench", "results", "test-sentinel"), { recursive: true, force: true });
     const sentinelDir = await mkdtemp(join(tmpdir(), "bench-sentinel-"));
     const sentinelPath = join(sentinelDir, "opencode-sentinel");
     const binDir = join(sentinelDir, "bin");

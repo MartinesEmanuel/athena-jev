@@ -76,8 +76,14 @@ export function redact(value, context) {
   return output;
 }
 export const promptHash = (prompt) => sha256(prompt);
+export function canonicalJson(value) {
+  if (value === null || typeof value === "boolean" || typeof value === "number" || typeof value === "string") return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map((item) => item === undefined ? "null" : canonicalJson(item)).join(",")}]`;
+  if (typeof value === "object") return `{${Object.keys(value).sort().filter((key) => value[key] !== undefined).map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  throw new BenchmarkInfrastructureError(`cannot canonicalize ${typeof value}`);
+}
 export function caseDefinitionFingerprint(caseDefinition) {
-  const canonical = JSON.stringify({
+  const canonical = canonicalJson({
     id: caseDefinition.id,
     category: caseDefinition.category,
     fixture: caseDefinition.fixture,
@@ -87,7 +93,7 @@ export function caseDefinitionFingerprint(caseDefinition) {
     requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy,
     requestedTools: caseDefinition.requestedTools,
     dataset: caseDefinition.dataset,
-  }, Object.keys(caseDefinition).sort());
+  });
   return sha256(canonical);
 }
 export const runKey = (pairId, arm) => `${pairId}:${arm}`;
@@ -870,7 +876,7 @@ function median(values) {
     ? sorted[middle]
     : (sorted[middle - 1] + sorted[middle]) / 2;
 }
-async function athenaTelemetry(path) {
+export async function athenaTelemetry(path) {
   const raw = await readFile(
     join(path, ".athena", "events.jsonl"),
     "utf8",
@@ -926,7 +932,7 @@ async function athenaTelemetry(path) {
           ]
         : null,
     },
-    jevCalls: providerCompleted.length > 0 || providerFailures.length > 0 ? providerCompleted.length : null,
+    jevCalls: providerCompleted.length > 0 || providerFailures.length > 0 ? providerCompleted.length + providerFailures.length : null,
     jevFailures: providerCompleted.length > 0 || providerFailures.length > 0 ? providerFailures.length : null,
     jevLatencyMs: providerLatency.length
       ? {
@@ -1120,6 +1126,13 @@ export function manifestCompatibility(prior, current) {
     conflicts.push({ field: "seed", prior: prior.seed, current: current.seed });
   if (JSON.stringify(prior.pairs) !== JSON.stringify(current.pairs))
     conflicts.push({ field: "pairs", prior: prior.pairs?.length, current: current.pairs?.length });
+  const priorCases = new Map((prior.cases ?? []).map((item) => [item.caseId, item]));
+  const currentCases = new Map((current.cases ?? []).map((item) => [item.caseId, item]));
+  for (const caseId of new Set([...priorCases.keys(), ...currentCases.keys()])) {
+    const left = priorCases.get(caseId); const right = currentCases.get(caseId);
+    if (!left || !right) { conflicts.push({ field: `cases.${caseId}`, prior: Boolean(left), current: Boolean(right) }); continue; }
+    for (const field of ["fixtureFingerprint", "taskPromptHash", "caseDefinitionFingerprint", "requestedNetworkPolicy", "requestedTools", "dataset", "category"]) if (canonicalJson(left[field]) !== canonicalJson(right[field])) conflicts.push({ field: `cases.${caseId}.${field}`, prior: left[field], current: right[field] });
+  }
   return { compatible: conflicts.length === 0, conflicts };
 }
 export function updateManifestRunStatus(manifest, runId, status) {
@@ -1167,7 +1180,7 @@ export async function runPair({
   const caseMetadata = [{ caseId, fixture: caseDefinition.fixture, fixtureFingerprint: fingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), caseDefinitionFingerprint: caseDefinitionFingerprint(caseDefinition), requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, requestedTools: caseDefinition.requestedTools, dataset: caseDefinition.dataset, category: caseDefinition.category }];
   const manifest = prior ?? experimentManifest({ plan, benchmarkCommit, frozenProductionDifferences: differences, productionRuntime, benchmarkHarnessFingerprint: harnessFingerprint, cases: caseMetadata });
   if (prior) {
-    const compatibility = manifestCompatibility(prior, { ...plan, benchmarkHarnessFingerprint: harnessFingerprint, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, athenaFrozenCommit: FROZEN_ATHENA_COMMIT });
+    const compatibility = manifestCompatibility(prior, { ...plan, benchmarkHarnessFingerprint: harnessFingerprint, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, cases: caseMetadata });
     if (!compatibility.compatible) throw new BenchmarkInfrastructureError(`resume incompatible: manifest drift: ${compatibility.conflicts.map((c) => c.field).join(", ")}`);
   }
   if (!prior) await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
