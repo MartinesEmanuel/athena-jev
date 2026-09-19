@@ -1,4 +1,6 @@
-# ATHENA V2 Architecture
+# Historical OpenCode V2 Architecture
+
+This OpenCode V2 implementation reference supplements [current architecture](architecture.md). It is not ATHENA's cross-agent architecture document.
 
 ## Server Control Plane + TUI Observability Plane
 

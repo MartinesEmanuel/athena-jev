@@ -14,7 +14,7 @@
     "eval": "node evals/run.mjs",
     "eval:report": "node evals/report.mjs",
     "metis:calibrate": "node evals/metis-calibration/run.mjs",
-    "release:check": "pnpm check && node packages/cli/dist/index.js demo && node packages/cli/dist/index.js doctor && pnpm --filter @athena/agent-sdk pack --pack-destination ../../.artifacts && pnpm --filter @athena/core pack --pack-destination ../../.artifacts && pnpm --filter @athena/typesafe pack --pack-destination ../../.artifacts && pnpm --filter @athena/opencode pack --pack-destination ../../.artifacts && pnpm --filter @athena/codex pack --pack-destination ../../.artifacts && pnpm --filter @athena/cursor pack --pack-destination ../../.artifacts && pnpm --filter ./packages/cli pack --pack-destination ../../.artifacts",
+    "release:check": "pnpm check && node packages/cli/dist/index.js demo && node packages/cli/dist/index.js doctor && pnpm --filter @athena/agent-sdk pack --pack-destination ../../.artifacts && pnpm --filter @athena/core pack --pack-destination ../../.artifacts && pnpm --filter @athena/typesafe pack --pack-destination ../../.artifacts && pnpm --filter @athena/opencode pack --pack-destination ../../.artifacts && pnpm --filter @athena/codex pack --pack-destination ../../.artifacts && pnpm --filter ./packages/cli pack --pack-destination ../../.artifacts",
     "launch:check": "pnpm release:check && pnpm eval && pnpm eval:report"
   },
   "devDependencies": {

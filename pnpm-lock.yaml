@@ -37,9 +37,6 @@ importers:
       '@athena/core':
         specifier: workspace:*
         version: link:../core
-      '@athena/cursor':
-        specifier: workspace:*
-        version: link:../cursor
       '@athena/typesafe':
         specifier: workspace:*
         version: link:../typesafe
