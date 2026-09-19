@@ -14,7 +14,7 @@
     "eval": "node evals/run.mjs",
     "eval:report": "node evals/report.mjs",
     "metis:calibrate": "node evals/metis-calibration/run.mjs",
-    "bench": "node bench/runners/cli.mjs run",
+    "bench": "node bench/runners/cli.mjs pair",
     "bench:pair": "node bench/runners/cli.mjs pair",
     "bench:analyze": "node bench/analysis/summary.mjs",
     "bench:report": "node bench/analysis/report.mjs",

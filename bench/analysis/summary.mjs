@@ -2,14 +2,18 @@
 import { readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import { validatePair } from "../runners/index.mjs";
+import { validatePair, validateResult } from "../runners/index.mjs";
 
 export function median(values) { if (!values.length) return null; const sorted = [...values].sort((a, b) => a - b); const middle = Math.floor(sorted.length / 2); return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2; }
 export function analyzeRuns(runs) {
-  const pairs = [...new Set(runs.map((run) => run.pairId))].map((pairId) => { const pairRuns = runs.filter((run) => run.pairId === pairId); const validity = validatePair(pairRuns); const control = pairRuns.find((run) => run.arm === "control"); const treatment = pairRuns.find((run) => run.arm === "treatment"); return { pairId, ...validity, treatmentMinusControl: control && treatment ? { durationMs: treatment.durationMs - control.durationMs, toolCalls: treatment.metrics.toolCalls - control.metrics.toolCalls, failedToolCalls: treatment.metrics.failedToolCalls - control.metrics.failedToolCalls } : null }; });
+  const artifactValidationErrors = [];
+  const validArtifacts = runs.filter((run) => { try { validateResult(run); return true; } catch (error) { artifactValidationErrors.push({ runId: run?.runId ?? null, reason: error.message }); return false; } });
+  const pairs = [...new Set(validArtifacts.map((run) => run.pairId))].map((pairId) => { const pairRuns = validArtifacts.filter((run) => run.pairId === pairId); const validity = validatePair(pairRuns); const control = pairRuns.find((run) => run.arm === "control"); const treatment = pairRuns.find((run) => run.arm === "treatment"); return { pairId, ...validity, treatmentMinusControl: control && treatment ? { durationMs: treatment.durationMs - control.durationMs, toolCalls: treatment.metrics.toolCalls - control.metrics.toolCalls, failedToolCalls: treatment.metrics.failedToolCalls - control.metrics.failedToolCalls, tokensDelta: typeof treatment.metrics.hostTokens?.total === "number" && typeof control.metrics.hostTokens?.total === "number" ? treatment.metrics.hostTokens.total - control.metrics.hostTokens.total : null } : null }; });
   const valid = new Set(pairs.filter((pair) => pair.pairValid).map((pair) => pair.pairId));
   const summarize = (arm) => { const selected = runs.filter((run) => run.arm === arm && valid.has(run.pairId)); const number = (key) => selected.map((run) => run.metrics[key]).filter((value) => typeof value === "number"); return { n: selected.length, successRate: selected.length ? selected.filter((run) => run.metrics.taskSuccess).length / selected.length : null, medianTimeToSolutionMs: median(number("timeToSolutionMs")), medianToolCalls: median(number("toolCalls")), medianLlmTurns: median(number("llmTurns")), medianFailedToolCalls: median(number("failedToolCalls")), replanCount: selected.reduce((sum, run) => sum + run.athenaTelemetrySummary.replan, 0), reflexCompleted: selected.reduce((sum, run) => sum + run.athenaTelemetrySummary.reflexCompleted, 0), jevCalls: selected.some((run) => typeof run.athenaTelemetrySummary.jevCalls === "number") ? selected.reduce((sum, run) => sum + (run.athenaTelemetrySummary.jevCalls ?? 0), 0) : null }; };
-  return { smokeTestOnly: true, validPairs: pairs.filter((pair) => pair.pairValid), invalidPairs: pairs.filter((pair) => !pair.pairValid), control: summarize("control"), treatment: summarize("treatment"), pairs };
+  const invalidPairs = pairs.filter((pair) => !pair.pairValid);
+  const invalidReasons = Object.fromEntries(invalidPairs.flatMap((pair) => pair.invalidReasons).sort().reduce((counts, reason) => counts.set(reason, (counts.get(reason) ?? 0) + 1), new Map()));
+  return { smokeTestOnly: true, plannedPairs: pairs.length, validPairs: pairs.filter((pair) => pair.pairValid), invalidPairs, invalidReasons, artifactValidationErrors, control: summarize("control"), treatment: summarize("treatment"), pairs };
 }
 
 const experimentId = process.argv.slice(2).find((argument) => argument !== "--");

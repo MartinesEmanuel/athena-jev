@@ -10,9 +10,12 @@ import {
   assertFrozenProduction,
   assertFrozenRuntimeGraph,
   assertResumeCompatible,
+  benchmarkHarnessFingerprint,
   completionDeclaration,
+  executeProcess,
   finalAssistantMessage,
   findExistingRun,
+  experimentManifest,
   fingerprintFixture,
   fingerprintProductionArtifacts,
   hostMetrics,
@@ -24,6 +27,8 @@ import {
   promptHash,
   redact,
   runKey,
+  resumeCompatibility,
+  updateManifestRunStatus,
   validateCase,
   validatePair,
   validateResult,
@@ -135,9 +140,16 @@ const result = (arm: "control" | "treatment", pairId = "fixture-r01") => ({
   taskPromptHash: "b".repeat(64),
   timeoutMs: 1000,
   requestedTools: ["read"],
+  requestedNetworkPolicy: "offline",
+  benchmarkHarnessFingerprint: "d".repeat(64),
+  dataset: "development",
+  category: "test-fix",
+  orderSeed: 1,
+  order: ["control", "treatment"],
   startedAt: "now",
   finishedAt: "now",
   durationMs: arm === "control" ? 10 : 20,
+  termination: { timedOut: false, terminationSignal: null, forcedKill: false },
   metrics: {
     taskSuccess: true,
     toolCalls: arm === "control" ? 2 : 4,
@@ -145,15 +157,26 @@ const result = (arm: "control" | "treatment", pairId = "fixture-r01") => ({
     failedToolCalls: 0,
     prematureCompletion: null,
   },
-  validator: {},
-  runtimeEvidence: { athenaAbsent: arm === "control" },
+  validator: { success: true, evidence: [] },
+  runtimeEvidence: {
+    athenaAbsent: arm === "control",
+    localAthenaPlugin: false,
+    athenaEventsFile: false,
+    hostAthenaEvidence: false,
+    providerCallVisibility: "unavailable",
+    providerCalls: null,
+  },
   athenaTelemetrySummary: {
     active: arm === "treatment",
     replan: 0,
     reflexCompleted: 0,
     jevCalls: null,
   },
-  environmentMetadata: {},
+  environmentMetadata: {
+    requestedNetworkPolicy: "offline",
+    orderSeed: 1,
+    order: ["control", "treatment"],
+  },
 });
 
 describe("benchmark harness", () => {
@@ -207,7 +230,7 @@ describe("benchmark harness", () => {
       result("control", "fixture-r02"),
       result("treatment", "fixture-r02"),
     ];
-    expect(findExistingRun(runs, "fixture-r02", "control")?.runId).toBe(
+    expect(findExistingRun(runs, "experiment", "fixture-r02", "control")?.runId).toBe(
       "fixture-r02-control",
     );
     expect(() =>
@@ -222,19 +245,70 @@ describe("benchmark harness", () => {
     ).toThrow("Run budget");
   });
 
+  it("creates six unique planned runs for three replicates", () => {
+    const plan = planExperiment({ caseDefinition: sampleCase, replicates: 3, seed: 7, model: "m", timeoutMs: 1000, experimentId: "one" });
+    expect(new Set(plan.pairs.map((pair: { pairId: string }) => pair.pairId)).size).toBe(3);
+    const runs = plan.pairs.flatMap((pair: { runs: Array<{ runId: string }> }) => pair.runs);
+    expect(new Set(runs.map((run: { runId: string }) => run.runId)).size).toBe(6);
+    expect(runs.map((run: { runId: string }) => run.runId)).toEqual(["fixture-r01-control", "fixture-r01-treatment", "fixture-r02-treatment", "fixture-r02-control", "fixture-r03-control", "fixture-r03-treatment"]);
+  });
+
+  it("fingerprints only behavior-relevant harness files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-bench-harness-"));
+    for (const directory of ["runners", "validators", "schema", "analysis", "results"]) await mkdir(join(root, directory), { recursive: true });
+    await writeFile(join(root, "runners", "index.mjs"), "export const runner = 1;\n");
+    await writeFile(join(root, "validators", "index.mjs"), "export const validator = 1;\n");
+    const fingerprint = await benchmarkHarnessFingerprint(root);
+    expect(await benchmarkHarnessFingerprint(root)).toBe(fingerprint);
+    const reordered = await mkdtemp(join(tmpdir(), "athena-bench-harness-"));
+    await mkdir(join(reordered, "validators"), { recursive: true });
+    await mkdir(join(reordered, "runners"), { recursive: true });
+    await writeFile(join(reordered, "validators", "index.mjs"), "export const validator = 1;\n");
+    await writeFile(join(reordered, "runners", "index.mjs"), "export const runner = 1;\n");
+    expect(await benchmarkHarnessFingerprint(reordered)).toBe(fingerprint);
+    await writeFile(join(root, "README.md"), "docs changed\n");
+    await writeFile(join(root, "results", "run.json"), "generated\n");
+    expect(await benchmarkHarnessFingerprint(root)).toBe(fingerprint);
+    await writeFile(join(root, "runners", "index.mjs"), "export const runner = 2;\n");
+    expect(await benchmarkHarnessFingerprint(root)).not.toBe(fingerprint);
+  });
+
+  it("preserves full manifest plan through status updates", () => {
+    const secondCase = { ...sampleCase, id: "fixture-two" };
+    const plan = planExperiment({ caseDefinitions: [sampleCase, secondCase], replicates: 2, seed: 1, model: "m", timeoutMs: 1000, experimentId: "manifest" });
+    const manifest = experimentManifest({ plan, benchmarkCommit: "a", frozenProductionDifferences: [], benchmarkHarnessFingerprint: "d".repeat(64), productionRuntime: { productionArtifactFingerprint: "c".repeat(64), provenance: result("control").productionRuntime }, cases: [] });
+    expect(manifest.pairs).toHaveLength(4);
+    expect(manifest.runs).toHaveLength(8);
+    expect(manifest.runs.every((run: { status: string }) => run.status === "pending")).toBe(true);
+    updateManifestRunStatus(manifest, manifest.runs[0].runId, "completed");
+    expect(manifest.runs).toHaveLength(8);
+    expect(manifest.runs[0].status).toBe("completed");
+  });
+
+  it("rejects incompatible completed runs with structured conflicts", () => {
+    const stored = result("control");
+    const compatibility = resumeCompatibility(stored, { ...stored, fixtureFingerprint: "e".repeat(64) });
+    expect(compatibility.resumeCompatible).toBe(false);
+    expect(compatibility.fields[0].field).toBe("fixtureFingerprint");
+    expect(() => assertResumeCompatible(stored, { ...stored, benchmarkHarnessFingerprint: "e".repeat(64) })).toThrow("benchmarkHarnessFingerprint");
+    expect(resumeCompatibility({ ...stored, benchmarkHarnessFingerprint: undefined }, stored).reason).toBe("missing benchmarkHarnessFingerprint");
+  });
+
+  it("rejects resume when fixture path stays constant but content changes", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-bench-fixture-"));
+    await writeFile(join(root, "fixture.txt"), "first");
+    const stored = { ...result("control"), fixtureFingerprint: await fingerprintFixture(root) };
+    await writeFile(join(root, "fixture.txt"), "second");
+    const compatibility = resumeCompatibility(stored, { ...stored, fixtureFingerprint: await fingerprintFixture(root) });
+    expect(compatibility.resumeCompatible).toBe(false);
+    expect(compatibility.fields).toEqual(expect.arrayContaining([expect.objectContaining({ field: "fixtureFingerprint" })]));
+  });
+
   it("rejects incompatible resume definitions", () => {
-    const plan = planExperiment({
-      caseDefinition: sampleCase,
-      replicates: 1,
-      seed: 1,
-      model: "m",
-      timeoutMs: 1000,
-      experimentId: "e",
-    });
     expect(() =>
-      assertResumeCompatible(plan, { ...plan, model: "other" }),
-    ).toThrow("Resume conflict: model");
-    expect(() => assertResumeCompatible(plan, plan)).not.toThrow();
+      assertResumeCompatible(result("control"), { ...result("control"), model: "other" }),
+    ).toThrow("model");
+    expect(() => assertResumeCompatible(result("control"), result("control"))).not.toThrow();
   });
 
   it("fingerprints isolated fixtures and installs ATHENA only for treatment", async () => {
@@ -269,6 +343,13 @@ describe("benchmark harness", () => {
         "utf8",
       ),
     ).toContain("AthenaV1Plugin");
+  });
+
+  it("terminates a hanging harmless child after timeout", async () => {
+    const execution = await executeProcess({ command: process.execPath, args: ["--eval", "setInterval(() => {}, 1000)"], cwd: process.cwd(), timeoutMs: 20, env: process.env });
+    expect(execution.timedOut).toBe(true);
+    expect(execution.terminationSignal).toBe("SIGTERM");
+    expect(execution.forcedKill).toBe(false);
   });
 
   it("uses frozen runtime after working-tree dist tampering", async () => {
@@ -502,6 +583,11 @@ describe("benchmark harness", () => {
       },
     ];
     expect(validatePair(validRuns).pairValid).toBe(true);
+    const failedRuns = validRuns.map((run) => ({
+      ...run,
+      metrics: { ...run.metrics, taskSuccess: false },
+    }));
+    expect(validatePair(failedRuns).pairValid).toBe(true);
     expect(validatePair(invalidRuns).invalidReasons).toContain(
       "treatment ATHENA inactive",
     );
@@ -520,5 +606,139 @@ describe("benchmark harness", () => {
   it("counterbalances deterministic order", () => {
     expect(orderedArms(7, 1)).not.toEqual(orderedArms(7, 2));
     expect(promptHash("x")).toBe(promptHash("x"));
+  });
+
+  it("rejects budgets exceeding hard limits", () => {
+    expect(() =>
+      planExperiment({
+        caseDefinition: sampleCase,
+        replicates: 10,
+        seed: 1,
+        model: "m",
+        timeoutMs: 1000,
+        experimentId: "max-ok",
+      }),
+    ).not.toThrow();
+    expect(() =>
+      planExperiment({
+        caseDefinition: sampleCase,
+        replicates: 11,
+        seed: 1,
+        model: "m",
+        timeoutMs: 1000,
+        experimentId: "over",
+      }),
+    ).toThrow("Run budget");
+  });
+
+  it("computes correct medians ignoring null entries", () => {
+    expect(median([1])).toBe(1);
+    expect(median([1, 3])).toBe(2);
+    expect(median([1, 2, 9])).toBe(2);
+    expect(median([1, 2, 8, 10])).toBe(5);
+    expect(median([])).toBeNull();
+    expect(median([null as unknown as number])).toBeNull();
+  });
+
+  it("redacts absolute paths using contextual roots", () => {
+    const ctx = {
+      repoRoot: "/home/example/Documents/athena-jev",
+      homeRoot: "/home/example",
+      workdirRoot: "/tmp/custom-random-123/session-root",
+    };
+    expect(redact("/home/example/Documents/athena-jev/foo", ctx)).toBe(
+      "$REPO/foo",
+    );
+    expect(redact("/home/example/.config/opencode", ctx)).toBe(
+      "$HOME/.config/opencode",
+    );
+    expect(
+      redact("/tmp/custom-random-123/session-root/file.txt", ctx),
+    ).toBe("$WORKDIR/file.txt");
+    expect(redact("/tmp/unrelated-temp/other/file.txt", ctx)).toBe(
+      "/tmp/unrelated-temp/other/file.txt",
+    );
+    expect(redact("/home/otheruser/.config/file.json", ctx)).toBe(
+      "/home/otheruser/.config/file.json",
+    );
+  });
+
+  it("falls back to default repo/home roots without context", () => {
+    expect(redact("/home/martins/Documents/athena-jev/x")).toContain("$REPO");
+    expect(redact("/home/martins/.config/opencode/auth.json")).toContain(
+      "$HOME",
+    );
+  });
+
+  it("redacts secrets from JSON and header forms", () => {
+    const json =
+      '{"token":"super-secret-token","api_key":"fake-api-key","Authorization":"Bearer fake-bearer"}';
+    expect(redact(json)).not.toContain("super-secret-token");
+    expect(redact(json)).not.toContain("fake-api-key");
+    expect(redact(json)).not.toContain("fake-bearer");
+    expect(redact(json)).toContain("[REDACTED]");
+    expect(redact("token=secret123")).not.toContain("secret123");
+    expect(redact("api_key=secret456")).not.toContain("secret456");
+    expect(redact("Authorization: Bearer fake-bearer-2")).not.toContain(
+      "fake-bearer-2",
+    );
+    expect(redact("apiKey=secret789")).not.toContain("secret789");
+  });
+
+  it("excludes malformed results from analysis headline statistics", () => {
+    const good = [
+      result("control", "fixture-r01"),
+      result("treatment", "fixture-r01"),
+    ];
+    const malformed = {
+      schemaVersion: "1.1",
+      experimentId: "experiment",
+      pairId: "fixture-r02",
+      runId: "fixture-r02-control",
+      caseId: "fixture",
+      arm: "control",
+      status: "completed",
+      benchmarkCommit: "a",
+      athenaFrozenCommit: FROZEN_ATHENA_COMMIT,
+      productionArtifactFingerprint: "c".repeat(64),
+      benchmarkHarnessFingerprint: "d".repeat(64),
+    };
+    const analysis = analyzeRuns([...good, malformed as unknown as ReturnType<typeof result>]);
+    expect(analysis.control.n).toBe(1);
+    expect(analysis.artifactValidationErrors).toHaveLength(1);
+    expect(analysis.artifactValidationErrors[0].runId).toBe(
+      "fixture-r02-control",
+    );
+  });
+
+  it("excludes analysis from invalid pairs while preserving them", () => {
+    const valid = [
+      result("control", "fixture-r01"),
+      result("treatment", "fixture-r01"),
+    ];
+    const invalid = [
+      result("control", "fixture-r02"),
+      {
+        ...result("treatment", "fixture-r02"),
+        athenaTelemetrySummary: {
+          active: false,
+          replan: 0,
+          reflexCompleted: 0,
+          jevCalls: null,
+        },
+      },
+    ];
+    const analysis = analyzeRuns([...valid, ...invalid]);
+    expect(analysis.control.n).toBe(1);
+    expect(analysis.invalidPairs).toHaveLength(1);
+  });
+
+  it("does not overwrite previous invalid results on resume", () => {
+    expect(
+      resumeCompatibility(
+        { ...result("control"), fixtureFingerprint: "a".repeat(64) },
+        { ...result("control"), fixtureFingerprint: "b".repeat(64) },
+      ).resumeCompatible,
+    ).toBe(false);
   });
 });

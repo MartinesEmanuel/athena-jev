@@ -1,5 +1,5 @@
 /* global process, setTimeout, clearTimeout */
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import {
   cp,
   mkdir,
@@ -13,7 +13,7 @@ import {
   writeFile,
 } from "node:fs/promises";
 import { tmpdir, homedir } from "node:os";
-import { join, relative, resolve } from "node:path";
+import { extname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { spawn, execFile } from "node:child_process";
@@ -59,21 +59,25 @@ const redactPatterns = [
 ];
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
-const logicalPath = (value) =>
-  String(value)
-    .replaceAll(root, "$REPO")
-    .replaceAll(homedir(), "$HOME")
-    .replace(/\/tmp\/athena-bench-work-[^/]+/g, "$WORKDIR");
-export function redact(value) {
-  let output = logicalPath(value);
+function logicalPath(value, context) {
+  const repoRoot = context?.repoRoot ?? root;
+  const homeRoot = context?.homeRoot ?? homedir();
+  const workdirRoot = context?.workdirRoot;
+  let output = String(value);
+  output = output.replaceAll(repoRoot, "$REPO");
+  output = output.replaceAll(homeRoot, "$HOME");
+  if (workdirRoot) output = output.replaceAll(workdirRoot, "$WORKDIR");
+  return output;
+}
+export function redact(value, context) {
+  let output = logicalPath(value, context);
   for (const pattern of redactPatterns)
     output = output.replace(pattern, (_match, prefix) => `${prefix}[REDACTED]`);
   return output;
 }
 export const promptHash = (prompt) => sha256(prompt);
 export const runKey = (pairId, arm) => `${pairId}:${arm}`;
-export const runId = (pairId, arm) =>
-  `${pairId}-${arm}-${randomUUID().slice(0, 8)}`;
+export const runId = (pairId, arm) => `${pairId}-${arm}`;
 export const orderedArms = (seed, replicate) =>
   ((seed + replicate) >>> 0) % 2 === 0
     ? ["control", "treatment"]
@@ -110,7 +114,9 @@ export function validateCase(value) {
   if (
     !/^[a-z0-9-]+$/.test(value.id) ||
     !categories.has(value.category) ||
-    !datasets.has(value.dataset)
+    !datasets.has(value.dataset) ||
+    typeof value.fixture !== "string" || !value.fixture ||
+    typeof value.taskPrompt !== "string" || !value.taskPrompt
   )
     fail("case id, category, or dataset");
   if (
@@ -127,14 +133,15 @@ export function validateCase(value) {
     fail("validator kind");
   if (
     value.validator.kind === "file-present" &&
-    typeof value.validator.path !== "string"
+    (typeof value.validator.path !== "string" || !value.validator.path)
   )
     fail("file-present path");
   if (
     value.validator.kind === "command" &&
     (!Array.isArray(value.validator.command) ||
-      !value.validator.command.length ||
-      !Number.isInteger(value.validator.expectedExit))
+       !value.validator.command.length ||
+       !Number.isInteger(value.validator.expectedExit) ||
+       value.validator.command.some((item) => typeof item !== "string" || !item))
   )
     fail("command validator");
   return value;
@@ -152,6 +159,12 @@ export function validateResult(value) {
     "athenaFrozenCommit",
     "productionArtifactFingerprint",
     "productionRuntime",
+    "benchmarkHarnessFingerprint",
+    "requestedNetworkPolicy",
+    "dataset",
+    "category",
+    "orderSeed",
+    "order",
     "host",
     "hostVersion",
     "model",
@@ -163,6 +176,7 @@ export function validateResult(value) {
     "startedAt",
     "finishedAt",
     "durationMs",
+    "termination",
     "metrics",
     "validator",
     "runtimeEvidence",
@@ -187,6 +201,7 @@ export function validateResult(value) {
   if (
     value.athenaFrozenCommit !== FROZEN_ATHENA_COMMIT ||
     !/^[a-f0-9]{64}$/.test(value.productionArtifactFingerprint) ||
+    !/^[a-f0-9]{64}$/.test(value.benchmarkHarnessFingerprint) ||
     !/^[a-f0-9]{64}$/.test(value.fixtureFingerprint) ||
     !/^[a-f0-9]{64}$/.test(value.taskPromptHash)
   )
@@ -200,9 +215,14 @@ export function validateResult(value) {
     value.productionRuntime.artifactRoot.startsWith("/")
   )
     fail("result production runtime");
+  if (!value.experimentId || !value.pairId || !value.runId || !value.caseId || !value.host || !value.hostVersion || !value.model || typeof value.modelConfig !== "object" || !Number.isInteger(value.timeoutMs) || value.timeoutMs < 1000 || !Array.isArray(value.requestedTools) || !["offline", "allow", "deny"].includes(value.requestedNetworkPolicy) || !datasets.has(value.dataset) || !categories.has(value.category) || !Array.isArray(value.order) || !Number.isInteger(value.orderSeed)) fail("result identity");
   if (
     typeof value.metrics.taskSuccess !== "boolean" ||
-    !Object.hasOwn(value.metrics, "prematureCompletion")
+    !Object.hasOwn(value.metrics, "prematureCompletion") ||
+    typeof value.validator?.success !== "boolean" ||
+    !Array.isArray(value.validator?.evidence) ||
+    typeof value.athenaTelemetrySummary?.active !== "boolean" ||
+    typeof value.runtimeEvidence?.athenaAbsent !== "boolean"
   )
     fail("result metrics");
   return value;
@@ -231,6 +251,30 @@ export async function fingerprintFixture(path) {
   const hash = createHash("sha256");
   for (const file of await files(path)) {
     hash.update(relative(path, file));
+    hash.update("\0");
+    hash.update(await readFile(file));
+    hash.update("\0");
+  }
+  return hash.digest("hex");
+}
+const HARNESS_DIRECTORIES = ["runners", "validators", "schema", "analysis"];
+const HARNESS_EXTENSIONS = new Set([".mjs", ".json"]);
+export async function harnessFiles(directory = benchRoot) {
+  const output = [];
+  for (const name of HARNESS_DIRECTORIES) {
+    const path = join(directory, name);
+    if (!(await exists(path))) continue;
+    for (const file of await files(path))
+      if (HARNESS_EXTENSIONS.has(extname(file))) output.push(file);
+  }
+  return output.sort((left, right) =>
+    relative(directory, left).localeCompare(relative(directory, right)),
+  );
+}
+export async function benchmarkHarnessFingerprint(directory = benchRoot) {
+  const hash = createHash("sha256");
+  for (const file of await harnessFiles(directory)) {
+    hash.update(relative(directory, file));
     hash.update("\0");
     hash.update(await readFile(file));
     hash.update("\0");
@@ -575,29 +619,25 @@ async function isolatedEnvironment(home) {
     ATHENA_MODE: "balanced",
   };
 }
-function executeAgent({ cwd, prompt, model, timeoutMs, env }) {
+const TERMINATION_GRACE_MS = 3_000;
+export function executeProcess({ command, args, cwd, timeoutMs, env }) {
   return new Promise((resolve) => {
-    const child = spawn(
-      "opencode",
-      [
-        "run",
-        "--dir",
-        cwd,
-        "--auto",
-        "--model",
-        model,
-        "--format",
-        "json",
-        prompt,
-      ],
-      { cwd, env, stdio: ["ignore", "pipe", "pipe"] },
-    );
+    const child = spawn(command, args, { cwd, env, stdio: ["ignore", "pipe", "pipe"] });
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let forcedKill = false;
+    let terminationSignal = null;
+    let graceTimer;
     const timer = setTimeout(() => {
       timedOut = true;
+      terminationSignal = "SIGTERM";
       child.kill("SIGTERM");
+      graceTimer = setTimeout(() => {
+        forcedKill = true;
+        terminationSignal = "SIGKILL";
+        child.kill("SIGKILL");
+      }, TERMINATION_GRACE_MS);
     }, timeoutMs);
     child.stdout.on("data", (chunk) => {
       stdout += chunk;
@@ -607,19 +647,26 @@ function executeAgent({ cwd, prompt, model, timeoutMs, env }) {
     });
     child.on("close", (code, signal) => {
       clearTimeout(timer);
-      resolve({ code, signal, timedOut, stdout, stderr });
+      clearTimeout(graceTimer);
+      resolve({ code, signal, timedOut, terminationSignal, forcedKill, stdout, stderr });
     });
     child.on("error", (error) => {
       clearTimeout(timer);
+      clearTimeout(graceTimer);
       resolve({
         code: null,
         signal: null,
         timedOut,
+        terminationSignal,
+        forcedKill,
         stdout,
         stderr: `${stderr}\n${error.message}`,
       });
     });
   });
+}
+function executeAgent({ cwd, prompt, model, timeoutMs, env }) {
+  return executeProcess({ command: "opencode", args: ["run", "--dir", cwd, "--auto", "--model", model, "--format", "json", prompt], cwd, timeoutMs, env });
 }
 
 function normalizeTimestamp(value) {
@@ -636,7 +683,7 @@ function toolCategory(name = "") {
 }
 const text = (value) =>
   typeof value === "string" ? value : JSON.stringify(value ?? "");
-export function parseHostTrace(stdout, stderr = "") {
+export function parseHostTrace(stdout, stderr = "", context) {
   const records = [];
   const stream = `${stdout}\n${stderr}`.split("\n").filter(Boolean);
   for (const [index, line] of stream.entries()) {
@@ -660,9 +707,9 @@ export function parseHostTrace(stdout, stderr = "") {
           tool,
           stateStatus: state.status ?? null,
           category: toolCategory(tool),
-          input: redact(text(state.input ?? event.input ?? event.args)),
-          result: redact(text(state.output ?? state.result ?? state.content)),
-          error: error === undefined ? null : redact(text(error)),
+          input: redact(text(state.input ?? event.input ?? event.args), context),
+          result: redact(text(state.output ?? state.result ?? state.content), context),
+          error: error === undefined ? null : redact(text(error), context),
           success:
             state.status === "error"
               ? false
@@ -689,7 +736,7 @@ export function parseHostTrace(stdout, stderr = "") {
           type: "assistant-text",
           sessionID: event.sessionID ?? part.sessionID ?? null,
           messageID: part.messageID ?? event.messageID ?? null,
-          text: redact(part.text ?? event.text ?? ""),
+          text: redact(part.text ?? event.text ?? "", context),
         });
       else
         records.push({
@@ -698,7 +745,7 @@ export function parseHostTrace(stdout, stderr = "") {
           timestamp,
           type: "host-event",
           sessionID: event.sessionID ?? null,
-          summary: redact(JSON.stringify(event)).slice(0, 4000),
+          summary: redact(JSON.stringify(event), context).slice(0, 4000),
         });
     } catch {
       records.push({
@@ -706,7 +753,7 @@ export function parseHostTrace(stdout, stderr = "") {
         order: index,
         timestamp: Date.now(),
         type: "host-output",
-        summary: redact(line).slice(0, 4000),
+        summary: redact(line, context).slice(0, 4000),
       });
     }
   }
@@ -872,6 +919,8 @@ export function validatePair(runs) {
   if (reasons.length) return { pairValid: false, invalidReasons: reasons };
   const [left, right] = [control[0], treatment[0]];
   for (const key of [
+    "experimentId",
+    "pairId",
     "caseId",
     "fixtureFingerprint",
     "taskPromptHash",
@@ -879,8 +928,13 @@ export function validatePair(runs) {
     "host",
     "hostVersion",
     "timeoutMs",
+    "athenaFrozenCommit",
+    "productionArtifactFingerprint",
+    "benchmarkHarnessFingerprint",
   ])
-    if (JSON.stringify(left[key]) !== JSON.stringify(right[key]))
+    if (left[key] === undefined || right[key] === undefined)
+      reasons.push(`missing ${key}`);
+    else if (JSON.stringify(left[key]) !== JSON.stringify(right[key]))
       reasons.push(`mismatched ${key}`);
   if (JSON.stringify(left.modelConfig) !== JSON.stringify(right.modelConfig))
     reasons.push("mismatched modelConfig");
@@ -888,6 +942,22 @@ export function validatePair(runs) {
     JSON.stringify(left.requestedTools) !== JSON.stringify(right.requestedTools)
   )
     reasons.push("mismatched requestedTools");
+  if (
+    left.environmentMetadata?.requestedNetworkPolicy === undefined ||
+    right.environmentMetadata?.requestedNetworkPolicy === undefined
+  )
+    reasons.push("missing requestedNetworkPolicy");
+  else if (
+    JSON.stringify(left.environmentMetadata?.requestedNetworkPolicy) !==
+    JSON.stringify(right.environmentMetadata?.requestedNetworkPolicy)
+  )
+    reasons.push("mismatched requestedNetworkPolicy");
+  if (
+    JSON.stringify(left.environmentMetadata?.order) !==
+      JSON.stringify(right.environmentMetadata?.order) ||
+    left.environmentMetadata?.orderSeed !== right.environmentMetadata?.orderSeed
+  )
+    reasons.push("mismatched arm order");
   if (
     left.productionArtifactFingerprint !==
       right.productionArtifactFingerprint ||
@@ -903,13 +973,17 @@ export function validatePair(runs) {
 }
 export function planExperiment({
   caseDefinition,
+  caseDefinitions,
   replicates,
   seed,
   model,
   timeoutMs,
   experimentId,
 }) {
-  const agentRuns = replicates * 2;
+  const cases = caseDefinitions ?? [caseDefinition];
+  if (!experimentId) throw new BenchmarkInfrastructureError("experimentId must be created before pair execution");
+  if (!cases.length) throw new BenchmarkInfrastructureError("experiment requires at least one case");
+  const agentRuns = cases.length * replicates * 2;
   if (replicates > MAX_PAIRS || agentRuns > MAX_AGENT_RUNS)
     throw new Error(
       `Run budget exceeded: maxPairs=${MAX_PAIRS}, maxAgentRuns=${MAX_AGENT_RUNS}`,
@@ -919,10 +993,7 @@ export function planExperiment({
     experimentId,
     frozenAthenaCommit: FROZEN_ATHENA_COMMIT,
     seed,
-    caseId: caseDefinition.id,
-    fixture: caseDefinition.fixture,
-    fixtureFingerprint: null,
-    taskPromptHash: promptHash(caseDefinition.taskPrompt),
+    caseId: cases.length === 1 ? cases[0].id : null,
     model,
     modelConfig: {
       model,
@@ -931,15 +1002,13 @@ export function planExperiment({
       reasoningEffort: "unsupported",
     },
     timeoutMs,
-    requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy,
-    networkIsolationVerified: false,
-    requestedTools: caseDefinition.requestedTools,
-    toolsIsolationVerified: false,
-    pairs: Array.from({ length: replicates }, (_, index) => ({
-      pairId: `${caseDefinition.id}-r${String(index + 1).padStart(2, "0")}`,
-      order: orderedArms(seed, index + 1),
-      agentRuns: 2,
-    })),
+    pairs: cases.flatMap((item) =>
+      Array.from({ length: replicates }, (_, index) => {
+        const pairId = `${item.id}-r${String(index + 1).padStart(2, "0")}`;
+        const order = orderedArms(seed, index + 1);
+        return { pairId, caseId: item.id, replicate: index + 1, order, runs: order.map((arm) => ({ runId: runId(pairId, arm), arm, status: "pending" })) };
+      }),
+    ),
     agentRuns,
     maxWallTimeMs: agentRuns * timeoutMs,
   };
@@ -954,20 +1023,52 @@ async function existingRuns(resultRoot) {
       ),
   );
 }
-export function findExistingRun(runs, pairId, arm) {
-  return runs.find((run) => run.pairId === pairId && run.arm === arm);
+export function findExistingRun(runs, experimentId, pairId, arm) {
+  return runs.find(
+    (run) =>
+      run.experimentId === experimentId &&
+      run.pairId === pairId &&
+      run.arm === arm,
+  );
 }
-export function assertResumeCompatible(manifest, plan) {
-  for (const key of [
-    "caseId",
-    "fixture",
-    "taskPromptHash",
-    "model",
-    "timeoutMs",
-    "frozenAthenaCommit",
-  ])
-    if (JSON.stringify(manifest[key]) !== JSON.stringify(plan[key]))
-      throw new Error(`Resume conflict: ${key}`);
+export function resumeCompatibility(stored, current) {
+  const fields = [
+    "experimentId", "pairId", "arm", "caseId", "fixtureFingerprint",
+    "taskPromptHash", "host", "hostVersion", "model", "modelConfig",
+    "timeoutMs", "requestedNetworkPolicy", "requestedTools",
+    "athenaFrozenCommit", "productionArtifactFingerprint",
+    "benchmarkHarnessFingerprint", "dataset", "category", "orderSeed", "order",
+  ];
+  const conflicts = [];
+  for (const field of fields) {
+    if (stored?.[field] === undefined) conflicts.push({ field, stored: null, current: redact(JSON.stringify(current?.[field])) , reason: `missing ${field}` });
+    else if (current?.[field] === undefined || JSON.stringify(stored[field]) !== JSON.stringify(current[field])) conflicts.push({ field, stored: redact(JSON.stringify(stored[field])), current: redact(JSON.stringify(current?.[field])) });
+  }
+  return { resumeCompatible: conflicts.length === 0, reason: conflicts[0]?.reason ?? null, fields: conflicts };
+}
+export function assertResumeCompatible(stored, current) {
+  const compatibility = resumeCompatibility(stored, current);
+  if (!compatibility.resumeCompatible) throw new BenchmarkInfrastructureError(`resume incompatible: ${compatibility.fields.map((conflict) => conflict.field).join(", ")}`);
+  return compatibility;
+}
+export function experimentManifest({ plan, benchmarkCommit, frozenProductionDifferences, productionRuntime, benchmarkHarnessFingerprint: harnessFingerprint, cases }) {
+  return {
+    ...plan,
+    benchmarkCommit,
+    frozenProductionDifferences,
+    athenaFrozenCommit: FROZEN_ATHENA_COMMIT,
+    productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint,
+    productionRuntime: productionRuntime.provenance,
+    benchmarkHarnessFingerprint: harnessFingerprint,
+    cases,
+    runs: plan.pairs.flatMap((pair) => pair.runs.map((run) => ({ ...run, pairId: pair.pairId, caseId: pair.caseId }))),
+  };
+}
+export function updateManifestRunStatus(manifest, runId, status) {
+  const run = manifest.runs.find((item) => item.runId === runId);
+  if (!run) throw new BenchmarkInfrastructureError(`manifest run absent: ${runId}`);
+  run.status = status;
+  return manifest;
 }
 export async function runPair({
   caseId,
@@ -977,23 +1078,12 @@ export async function runPair({
   model = DEFAULT_MODEL,
   dryRun = false,
   preserve = false,
-  experimentId,
   experimentPlan,
 }) {
   const caseDefinition = await loadCase(caseId);
   const effectiveTimeout = timeoutMs ?? caseDefinition.timeoutMs;
-  const plan =
-    experimentPlan ??
-    planExperiment({
-      caseDefinition,
-      replicates: 1,
-      seed,
-      model,
-      timeoutMs: effectiveTimeout,
-      experimentId:
-        experimentId ??
-        `bench-${new Date().toISOString().replace(/[:.]/g, "-")}`,
-    });
+  if (!experimentPlan) throw new BenchmarkInfrastructureError("runPair requires pre-created experiment plan");
+  const plan = experimentPlan;
   const pair = plan.pairs.find(
     (item) =>
       item.pairId === `${caseId}-r${String(replicate).padStart(2, "0")}`,
@@ -1002,9 +1092,11 @@ export async function runPair({
     throw new Error(`Pair absent from experiment plan: replicate ${replicate}`);
   const differences = await assertFrozenProduction(!dryRun);
   const productionRuntime = await prepareFrozenRuntime();
+  const harnessFingerprint = await benchmarkHarnessFingerprint();
   const benchmarkCommit = await git(["rev-parse", "HEAD"]);
   const source = join(fixtureRoot, caseDefinition.fixture);
   const fingerprint = await fingerprintFixture(source);
+  const version = await hostVersion();
   const resultRoot = join(benchRoot, "results", plan.experimentId);
   await mkdir(join(resultRoot, "runs"), { recursive: true });
   await mkdir(join(resultRoot, "raw"), { recursive: true });
@@ -1012,23 +1104,23 @@ export async function runPair({
   const prior = await readFile(manifestPath, "utf8")
     .then(JSON.parse)
     .catch(() => null);
-  if (prior) assertResumeCompatible(prior, plan);
-  else
-    await writeFile(
-      manifestPath,
-      `${JSON.stringify({ ...plan, fixtureFingerprint: fingerprint, benchmarkCommit, frozenProductionDifferences: differences, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, productionRuntime: productionRuntime.provenance }, null, 2)}\n`,
-    );
+  const caseMetadata = [{ caseId, fixture: caseDefinition.fixture, fixtureFingerprint: fingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, requestedTools: caseDefinition.requestedTools, dataset: caseDefinition.dataset, category: caseDefinition.category }];
+  const manifest = prior ?? experimentManifest({ plan, benchmarkCommit, frozenProductionDifferences: differences, productionRuntime, benchmarkHarnessFingerprint: harnessFingerprint, cases: caseMetadata });
+  if (prior && (prior.benchmarkHarnessFingerprint !== harnessFingerprint || prior.productionArtifactFingerprint !== productionRuntime.productionArtifactFingerprint || JSON.stringify(prior.pairs) !== JSON.stringify(plan.pairs))) throw new BenchmarkInfrastructureError("resume incompatible: experiment manifest identity");
+  if (!prior) await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  const saveManifest = async () => writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const completed = [];
   for (const arm of pair.order) {
-    const existing = findExistingRun(
-      await existingRuns(resultRoot),
-      pair.pairId,
-      arm,
-    );
+    const plannedRun = pair.runs.find((run) => run.arm === arm);
+    const runIdentity = { experimentId: plan.experimentId, pairId: pair.pairId, arm, caseId, fixtureFingerprint: fingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), host: "OpenCode", hostVersion: version, model, modelConfig: plan.modelConfig, timeoutMs: effectiveTimeout, requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, requestedTools: caseDefinition.requestedTools, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, benchmarkHarnessFingerprint: harnessFingerprint, dataset: caseDefinition.dataset, category: caseDefinition.category, orderSeed: seed, order: pair.order };
+    const existing = findExistingRun(await existingRuns(resultRoot), plan.experimentId, pair.pairId, arm);
     if (existing) {
+      assertResumeCompatible(existing, runIdentity);
       completed.push(existing);
       continue;
     }
+    updateManifestRunStatus(manifest, plannedRun.runId, "running");
+    await saveManifest();
     const workRoot = await mkdtemp(join(tmpdir(), "athena-bench-work-"));
     const work = join(workRoot, `pair_${pair.pairId}`, arm);
     const home = join(workRoot, "home");
@@ -1056,7 +1148,7 @@ export async function runPair({
           timeoutMs: effectiveTimeout,
           env: await isolatedEnvironment(home),
         });
-    const host = parseHostTrace(execution.stdout, execution.stderr);
+    const host = parseHostTrace(execution.stdout, execution.stderr, { workdirRoot: work });
     const telemetry = await athenaTelemetry(work);
     const localPlugin = await exists(
       join(work, ".opencode", "plugins", "athena.ts"),
@@ -1068,13 +1160,13 @@ export async function runPair({
       localAthenaPlugin: localPlugin,
       athenaEventsFile: telemetry.active,
       hostAthenaEvidence: hostAthena,
-      jevAttributableCalls: telemetry.jevCalls,
+      providerCallVisibility: telemetry.active ? "observed" : "unavailable",
+      providerCalls: telemetry.jevCalls,
       athenaAbsent:
         arm === "control" &&
         !localPlugin &&
         !telemetry.active &&
-        !hostAthena &&
-        telemetry.jevCalls === null,
+        !hostAthena,
       globalConfigurationIsolation:
         "OPENCODE_TEST_HOME with copied OAuth auth; external skills disabled",
     };
@@ -1094,7 +1186,7 @@ export async function runPair({
       schemaVersion: RESULT_VERSION,
       experimentId: plan.experimentId,
       pairId: pair.pairId,
-      runId: runId(pair.pairId, arm),
+      runId: plannedRun.runId,
       caseId,
       arm,
       status: execution.timedOut
@@ -1108,16 +1200,23 @@ export async function runPair({
         productionRuntime.productionArtifactFingerprint,
       productionRuntime: productionRuntime.provenance,
       host: "OpenCode",
-      hostVersion: await hostVersion(),
+      hostVersion: version,
       model,
       modelConfig: plan.modelConfig,
       fixtureFingerprint: runFingerprint,
       taskPromptHash: promptHash(caseDefinition.taskPrompt),
       timeoutMs: effectiveTimeout,
       requestedTools: caseDefinition.requestedTools,
+      requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy,
+      benchmarkHarnessFingerprint: harnessFingerprint,
+      dataset: caseDefinition.dataset,
+      category: caseDefinition.category,
+      orderSeed: seed,
+      order: pair.order,
       startedAt,
       finishedAt: new Date().toISOString(),
       durationMs,
+      termination: { timedOut: execution.timedOut, terminationSignal: execution.terminationSignal ?? null, forcedKill: execution.forcedKill ?? false },
       metrics: {
         taskSuccess: validator.success,
         timeToSolutionMs: validator.success ? durationMs : null,
@@ -1159,6 +1258,8 @@ export async function runPair({
       join(resultRoot, "runs", `${result.runId}.json`),
       `${JSON.stringify(result, null, 2)}\n`,
     );
+    updateManifestRunStatus(manifest, plannedRun.runId, result.status);
+    await saveManifest();
     await writeFile(
       join(resultRoot, "raw", `${result.runId}.jsonl`),
       trace.map((record) => JSON.stringify(record)).join("\n") +
