@@ -22,13 +22,18 @@ import {
   fingerprintFixture,
   fingerprintProductionArtifacts,
   hostMetrics,
+  loadCase,
   mergeTrace,
   orderedArms,
   parseHostTrace,
   planExperiment,
+  pluginActivationEvidence,
   prepareArm,
+  prepareExperiment,
+  prepareFrozenRuntime,
   promptHash,
   redact,
+  runPair,
   runKey,
   resumeCompatibility,
   updateManifestRunStatus,
@@ -169,6 +174,16 @@ const result = (arm: "control" | "treatment", pairId = "fixture-r01") => ({
     localAthenaPlugin: false,
     athenaEventsFile: false,
     hostAthenaEvidence: false,
+    pluginActivationEvidence: {
+      installed: arm === "treatment",
+      wrapperInitialized: arm === "treatment",
+      frozenRuntimeImported: arm === "treatment",
+      athenaV1Initialized: arm === "treatment",
+      registeredHooks: arm === "treatment" ? ["tool.execute.before", "tool.execute.after", "experimental.chat.system.transform"] : [],
+      firedHooks: arm === "treatment" ? ["tool.execute.before"] : [],
+      loadError: null,
+      active: arm === "treatment",
+    },
     providerCallVisibility: "unavailable",
     providerCalls: null,
     providerFailures: null,
@@ -356,6 +371,52 @@ describe("benchmark harness", () => {
     ).toContain("AthenaV1Plugin");
   });
 
+  it("records no host ATHENA evidence from an ATHENA-named temporary path", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-bench-work-"));
+    const probe = join(root, "athena-plugin-probe.jsonl");
+    await writeFile(probe, "/tmp/athena-bench-work-xyz/\n");
+    await expect(pluginActivationEvidence(probe, false)).resolves.toMatchObject({
+      installed: false,
+      active: false,
+      wrapperInitialized: false,
+    });
+  });
+
+  it("uses independent control absence and structured treatment activation evidence", async () => {
+    const control = result("control");
+    expect(control.runtimeEvidence.athenaAbsent).toBe(true);
+    expect(validatePair([control, result("treatment")]).pairValid).toBe(true);
+    const missingProbe = {
+      ...result("treatment"),
+      runtimeEvidence: {
+        ...result("treatment").runtimeEvidence,
+        pluginActivationEvidence: {
+          ...result("treatment").runtimeEvidence.pluginActivationEvidence,
+          firedHooks: [],
+          active: false,
+        },
+      },
+    };
+    expect(validatePair([control, missingProbe]).invalidReasons).toContain(
+      "treatment plugin activation not verified",
+    );
+    const root = await mkdtemp(join(tmpdir(), "athena-plugin-probe-"));
+    const probe = join(root, "probe.jsonl");
+    await writeFile(probe, [
+      '{"type":"wrapper-initialized"}',
+      '{"type":"frozen-runtime-imported"}',
+      '{"type":"athena-v1-initialized","registeredHooks":["tool.execute.before","tool.execute.after","experimental.chat.system.transform"]}',
+      '{"type":"hook-fired","name":"tool.execute.before"}',
+    ].join("\n"));
+    await expect(pluginActivationEvidence(probe, true)).resolves.toMatchObject({
+      installed: true,
+      wrapperInitialized: true,
+      frozenRuntimeImported: true,
+      athenaV1Initialized: true,
+      active: true,
+    });
+  });
+
   it("terminates a hanging harmless child after timeout", async () => {
     const execution = await executeProcess({ command: process.execPath, args: ["--eval", "setInterval(() => {}, 1000)"], cwd: process.cwd(), timeoutMs: 20, env: process.env });
     expect(execution.timedOut).toBe(true);
@@ -404,6 +465,22 @@ describe("benchmark harness", () => {
     expect(plugin).toContain(pathToFileURL(entrypoint).href);
     expect((await loadFrozenPlugin(entrypoint)).runtime).toBe("FROZEN");
     expect(await fingerprintProductionArtifacts(artifactRoot)).toBe(fingerprint);
+  });
+
+  it("imports and initializes frozen AthenaV1Plugin without invoking hooks", async () => {
+    const runtime = await prepareFrozenRuntime();
+    const module = await import(pathToFileURL(runtime.entrypoint).href);
+    expect(typeof module.AthenaV1Plugin).toBe("function");
+    const fixture = await mkdtemp(join(tmpdir(), "athena-plugin-init-"));
+    await mkdir(join(fixture, ".athena"));
+    const config = await readFile(join(process.cwd(), "evals", "fixtures", "controlled-semantic-loop", ".athena", "config.json"), "utf8");
+    await writeFile(join(fixture, ".athena", "config.json"), config.replace('"typesafe"', '"demo"'));
+    const hooks = await module.AthenaV1Plugin({ directory: fixture });
+    expect(Object.keys(hooks)).toEqual(expect.arrayContaining([
+      "tool.execute.before",
+      "tool.execute.after",
+      "experimental.chat.system.transform",
+    ]));
   });
 
   it("isolates frozen internal ATHENA dependencies from current production packages", async () => {
@@ -947,5 +1024,20 @@ describe("benchmark harness", () => {
     } finally {
       process.env.PATH = originalPath;
     }
+  });
+
+  it("prepares one complete multi-case manifest before any run and resumes both cases", async () => {
+    const loop = await loadCase("controlled-semantic-loop");
+    const fix = await loadCase("straightforward-fix");
+    const experimentId = `test-multi-case-${Date.now()}`;
+    const plan = planExperiment({ caseDefinitions: [loop, fix], replicates: 1, seed: 1, model: "m", timeoutMs: 1000, experimentId });
+    const setup = await prepareExperiment({ experimentPlan: plan, dryRun: true });
+    expect(setup.manifest.pairs).toHaveLength(2);
+    expect(setup.manifest.runs).toHaveLength(4);
+    expect(setup.manifest.cases.map((item: { caseId: string }) => item.caseId).sort()).toEqual(["controlled-semantic-loop", "straightforward-fix"]);
+    await expect(runPair({ caseId: loop.id, replicate: 1, seed: 1, timeoutMs: 1000, model: "m", dryRun: true, experimentPlan: plan, experimentSetup: setup })).resolves.toMatchObject({ pairId: "controlled-semantic-loop-r01" });
+    await expect(runPair({ caseId: fix.id, replicate: 1, seed: 1, timeoutMs: 1000, model: "m", dryRun: true, experimentPlan: plan, experimentSetup: setup })).resolves.toMatchObject({ pairId: "straightforward-fix-r01" });
+    const oneCasePlan = planExperiment({ caseDefinition: loop, replicates: 1, seed: 1, model: "m", timeoutMs: 1000, experimentId });
+    await expect(prepareExperiment({ experimentPlan: oneCasePlan, dryRun: true })).rejects.toThrow("manifest drift");
   });
 });

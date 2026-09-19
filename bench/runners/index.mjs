@@ -255,6 +255,11 @@ export function validateResult(value) {
     typeof value.runtimeEvidence?.localAthenaPlugin !== "boolean" ||
     typeof value.runtimeEvidence?.athenaEventsFile !== "boolean" ||
     typeof value.runtimeEvidence?.hostAthenaEvidence !== "boolean" ||
+    (value.runtimeEvidence?.pluginActivationEvidence !== undefined &&
+      (typeof value.runtimeEvidence.pluginActivationEvidence?.installed !== "boolean" ||
+       typeof value.runtimeEvidence.pluginActivationEvidence?.active !== "boolean" ||
+       !Array.isArray(value.runtimeEvidence.pluginActivationEvidence?.registeredHooks) ||
+       !Array.isArray(value.runtimeEvidence.pluginActivationEvidence?.firedHooks))) ||
     !["observed", "unavailable"].includes(value.runtimeEvidence?.providerCallVisibility) ||
     (value.runtimeEvidence?.providerCalls !== null && typeof value.runtimeEvidence?.providerCalls !== "number") ||
     (value.runtimeEvidence?.providerFailures !== null && typeof value.runtimeEvidence?.providerFailures !== "number") ||
@@ -489,6 +494,7 @@ export async function assertFrozenRuntimeGraph(artifactRoot) {
     artifactRoot,
     "@athena/core from @athena/typesafe",
   );
+  await import(pathToFileURL(entrypoint).href);
   return entrypoint;
 }
 
@@ -526,16 +532,16 @@ async function assembleFrozenRuntime(source, artifactRoot) {
     join(packages, "opencode", "node_modules", "@athena", "typesafe"),
   );
   await link(
-    join(source, "node_modules", "zod"),
+    join(source, "packages", "core", "node_modules", "zod"),
     join(packages, "core", "node_modules", "zod"),
   );
   await link(
-    join(source, "node_modules", "@typesafe-ai"),
+    join(source, "packages", "typesafe", "node_modules", "@typesafe-ai"),
     join(packages, "typesafe", "node_modules", "@typesafe-ai"),
   );
   await link(
-    join(source, "node_modules", "@opencode"),
-    join(packages, "opencode", "node_modules", "@opencode"),
+    join(source, "packages", "opencode", "node_modules", "@opencode", "plugin"),
+    join(packages, "opencode", "node_modules", "@opencode", "plugin"),
   );
 }
 
@@ -636,7 +642,26 @@ export async function prepareArm({
   const adapter = pathToFileURL(productionRuntime.entrypoint).href;
   await writeFile(
     join(target, ".opencode", "plugins", "athena.ts"),
-    `export { AthenaV1Plugin as AthenaPlugin } from ${JSON.stringify(adapter)};\n`,
+    `import { appendFile } from "node:fs/promises";
+const probePath = process.env.ATHENA_BENCH_PLUGIN_PROBE;
+const record = async (type, data = {}) => { if (!probePath) return; try { await appendFile(probePath, JSON.stringify({ type, ...data }) + "\\n"); } catch {} };
+const hookNames = ["tool.execute.before", "tool.execute.after", "experimental.chat.system.transform"];
+export const AthenaPlugin = async (context) => {
+  await record("wrapper-initialized");
+  try {
+    const runtime = await import(${JSON.stringify(adapter)});
+    await record("frozen-runtime-imported");
+    const hooks = await runtime.AthenaV1Plugin(context);
+    const registeredHooks = Object.keys(hooks).filter((name) => hookNames.includes(name));
+    await record("athena-v1-initialized", { registeredHooks });
+    const fired = new Set();
+    return Object.fromEntries(Object.entries(hooks).map(([name, hook]) => [name, hookNames.includes(name) && typeof hook === "function" ? async (...args) => { if (!fired.has(name)) { fired.add(name); await record("hook-fired", { name }); } return hook(...args); } : hook]));
+  } catch (error) {
+    await record("load-error", { name: error instanceof Error ? error.name : "Error", code: typeof error?.code === "string" ? error.code : null });
+    throw error;
+  }
+};
+`,
   );
 }
 async function exists(path) {
@@ -953,6 +978,29 @@ export async function athenaTelemetry(path) {
     rawEvents: events,
   };
 }
+const PROBED_HOOKS = new Set(["tool.execute.before", "tool.execute.after", "experimental.chat.system.transform"]);
+export async function pluginActivationEvidence(path, installed) {
+  const lines = await readFile(path, "utf8").catch(() => "");
+  const evidence = { installed, wrapperInitialized: false, frozenRuntimeImported: false, athenaV1Initialized: false, registeredHooks: [], firedHooks: [], loadError: null, active: false };
+  for (const line of lines.split("\n").filter(Boolean)) {
+    try {
+      const event = JSON.parse(line);
+      if (event.type === "wrapper-initialized") evidence.wrapperInitialized = true;
+      if (event.type === "frozen-runtime-imported") evidence.frozenRuntimeImported = true;
+      if (event.type === "athena-v1-initialized") {
+        evidence.athenaV1Initialized = true;
+        evidence.registeredHooks = Array.isArray(event.registeredHooks) ? event.registeredHooks.filter((name) => PROBED_HOOKS.has(name)) : [];
+      }
+      if (event.type === "hook-fired" && PROBED_HOOKS.has(event.name)) evidence.firedHooks.push(event.name);
+      if (event.type === "load-error") evidence.loadError = { name: typeof event.name === "string" ? event.name : "Error", code: typeof event.code === "string" ? event.code : null };
+    } catch {
+      // Ignore malformed probe records; probe output is diagnostic only.
+    }
+  }
+  evidence.firedHooks = [...new Set(evidence.firedHooks)];
+  evidence.active = evidence.wrapperInitialized && evidence.frozenRuntimeImported && evidence.athenaV1Initialized && evidence.firedHooks.length > 0;
+  return evidence;
+}
 export function validatePair(runs) {
   const reasons = [];
   const control = runs.filter((run) => run.arm === "control");
@@ -1011,6 +1059,8 @@ export function validatePair(runs) {
     reasons.push("mismatched production runtime");
   if (!left.runtimeEvidence?.athenaAbsent)
     reasons.push("control ATHENA absence not verified");
+  if (!right.runtimeEvidence?.pluginActivationEvidence?.active)
+    reasons.push("treatment plugin activation not verified");
   if (!right.athenaTelemetrySummary?.active)
     reasons.push("treatment ATHENA inactive");
   return { pairValid: reasons.length === 0, invalidReasons: reasons };
@@ -1141,6 +1191,41 @@ export function updateManifestRunStatus(manifest, runId, status) {
   run.status = status;
   return manifest;
 }
+export async function prepareExperiment({ experimentPlan, dryRun = false }) {
+  if (!experimentPlan)
+    throw new BenchmarkInfrastructureError("prepareExperiment requires pre-created experiment plan");
+  const caseIds = [...new Set(experimentPlan.pairs.map((pair) => pair.caseId))];
+  const caseDefinitions = await Promise.all(caseIds.map(loadCase));
+  const differences = await assertFrozenProduction(!dryRun);
+  const productionRuntime = await prepareFrozenRuntime();
+  const harnessFingerprint = await benchmarkHarnessFingerprint();
+  const benchmarkCommit = await git(["rev-parse", "HEAD"]);
+  const cases = await Promise.all(caseDefinitions.map(async (caseDefinition) => ({
+    caseId: caseDefinition.id,
+    fixture: caseDefinition.fixture,
+    fixtureFingerprint: await fingerprintFixture(join(fixtureRoot, caseDefinition.fixture)),
+    taskPromptHash: promptHash(caseDefinition.taskPrompt),
+    caseDefinitionFingerprint: caseDefinitionFingerprint(caseDefinition),
+    requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy,
+    requestedTools: caseDefinition.requestedTools,
+    dataset: caseDefinition.dataset,
+    category: caseDefinition.category,
+  })));
+  const resultRoot = join(benchRoot, "results", experimentPlan.experimentId);
+  await mkdir(join(resultRoot, "runs"), { recursive: true });
+  await mkdir(join(resultRoot, "raw"), { recursive: true });
+  const manifestPath = join(resultRoot, "manifest.json");
+  const prior = await readFile(manifestPath, "utf8").then(JSON.parse).catch(() => null);
+  const current = { ...experimentPlan, benchmarkHarnessFingerprint: harnessFingerprint, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, cases };
+  if (prior) {
+    const compatibility = manifestCompatibility(prior, current);
+    if (!compatibility.compatible)
+      throw new BenchmarkInfrastructureError(`resume incompatible: manifest drift: ${compatibility.conflicts.map((conflict) => conflict.field).join(", ")}`);
+  }
+  const manifest = prior ?? experimentManifest({ plan: experimentPlan, benchmarkCommit, frozenProductionDifferences: differences, productionRuntime, benchmarkHarnessFingerprint: harnessFingerprint, cases });
+  if (!prior) await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  return { caseDefinitions: new Map(caseDefinitions.map((item) => [item.id, item])), productionRuntime, harnessFingerprint, benchmarkCommit, resultRoot, manifestPath, manifest };
+}
 export async function runPair({
   caseId,
   replicate = 1,
@@ -1150,11 +1235,14 @@ export async function runPair({
   dryRun = false,
   preserve = false,
   experimentPlan,
+  experimentSetup,
   confirmLive = false,
 }) {
   if (!experimentPlan) throw new BenchmarkInfrastructureError("runPair requires pre-created experiment plan");
   if (!dryRun && !confirmLive) throw new BenchmarkInfrastructureError("runPair requires confirmLive: true for live execution");
-  const caseDefinition = await loadCase(caseId);
+  const setup = experimentSetup ?? await prepareExperiment({ experimentPlan, dryRun });
+  const caseDefinition = setup.caseDefinitions.get(caseId);
+  if (!caseDefinition) throw new BenchmarkInfrastructureError(`case absent from experiment plan: ${caseId}`);
   const effectiveTimeout = timeoutMs ?? caseDefinition.timeoutMs;
   const plan = experimentPlan;
   const pair = plan.pairs.find(
@@ -1163,27 +1251,10 @@ export async function runPair({
   );
   if (!pair)
     throw new Error(`Pair absent from experiment plan: replicate ${replicate}`);
-  const differences = await assertFrozenProduction(!dryRun);
-  const productionRuntime = await prepareFrozenRuntime();
-  const harnessFingerprint = await benchmarkHarnessFingerprint();
-  const benchmarkCommit = await git(["rev-parse", "HEAD"]);
+  const { productionRuntime, harnessFingerprint, benchmarkCommit, resultRoot, manifestPath, manifest } = setup;
   const source = join(fixtureRoot, caseDefinition.fixture);
   const fingerprint = await fingerprintFixture(source);
   const version = dryRun ? "unverified-dry-run" : await hostVersion();
-  const resultRoot = join(benchRoot, "results", plan.experimentId);
-  await mkdir(join(resultRoot, "runs"), { recursive: true });
-  await mkdir(join(resultRoot, "raw"), { recursive: true });
-  const manifestPath = join(resultRoot, "manifest.json");
-  const prior = await readFile(manifestPath, "utf8")
-    .then(JSON.parse)
-    .catch(() => null);
-  const caseMetadata = [{ caseId, fixture: caseDefinition.fixture, fixtureFingerprint: fingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), caseDefinitionFingerprint: caseDefinitionFingerprint(caseDefinition), requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, requestedTools: caseDefinition.requestedTools, dataset: caseDefinition.dataset, category: caseDefinition.category }];
-  const manifest = prior ?? experimentManifest({ plan, benchmarkCommit, frozenProductionDifferences: differences, productionRuntime, benchmarkHarnessFingerprint: harnessFingerprint, cases: caseMetadata });
-  if (prior) {
-    const compatibility = manifestCompatibility(prior, { ...plan, benchmarkHarnessFingerprint: harnessFingerprint, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, cases: caseMetadata });
-    if (!compatibility.compatible) throw new BenchmarkInfrastructureError(`resume incompatible: manifest drift: ${compatibility.conflicts.map((c) => c.field).join(", ")}`);
-  }
-  if (!prior) await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const saveManifest = async () => writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   const completed = [];
   for (const arm of pair.order) {
@@ -1200,6 +1271,7 @@ export async function runPair({
     const workRoot = await mkdtemp(join(tmpdir(), "athena-bench-work-"));
     const work = join(workRoot, `pair_${pair.pairId}`, arm);
     const home = join(workRoot, "home");
+    const probe = join(workRoot, "athena-plugin-probe.jsonl");
     await mkdir(join(workRoot, `pair_${pair.pairId}`), { recursive: true });
     await prepareArm({ caseDefinition, arm, target: work, productionRuntime });
     const runFingerprint = await fingerprintFixture(work);
@@ -1222,21 +1294,21 @@ export async function runPair({
           prompt: caseDefinition.taskPrompt,
           model,
           timeoutMs: effectiveTimeout,
-          env: await isolatedEnvironment(home),
+          env: { ...(await isolatedEnvironment(home)), ATHENA_BENCH_PLUGIN_PROBE: probe },
         });
     const host = parseHostTrace(execution.stdout, execution.stderr, { workdirRoot: work });
     const telemetry = await athenaTelemetry(work);
     const localPlugin = await exists(
       join(work, ".opencode", "plugins", "athena.ts"),
     );
-    const hostAthena = /athena|typesafe|jev/i.test(
-      `${execution.stdout}\n${execution.stderr}`,
-    );
+    const activation = await pluginActivationEvidence(probe, localPlugin);
+    const hostAthena = activation.active;
     const providerObserved = telemetry.jevCalls !== null || telemetry.jevFailures !== null;
     const runtimeEvidence = {
       localAthenaPlugin: localPlugin,
-      athenaEventsFile: telemetry.active,
-      hostAthenaEvidence: hostAthena,
+        athenaEventsFile: telemetry.active,
+        hostAthenaEvidence: hostAthena,
+        pluginActivationEvidence: activation,
       providerCallVisibility: providerObserved ? "observed" : "unavailable",
       providerCalls: telemetry.jevCalls,
       providerFailures: telemetry.jevFailures,
@@ -1245,7 +1317,7 @@ export async function runPair({
         arm === "control" &&
         !localPlugin &&
         !telemetry.active &&
-        !hostAthena,
+        !activation.active,
       globalConfigurationIsolation:
         "OPENCODE_TEST_HOME with copied OAuth auth; external skills disabled",
     };
