@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://athena-jev.dev/bench/case.schema.json",
+  "title": "ATHENA benchmark case",
+  "type": "object",
+  "required": ["id", "title", "category", "description", "fixture", "taskPrompt", "validator", "timeoutMs", "expectedBehavior", "tags", "difficulty", "requestedNetworkPolicy", "requestedTools", "dataset"],
+  "properties": {
+    "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "title": { "type": "string", "minLength": 1 },
+    "category": { "enum": ["semantic-loop", "legitimate-progress", "risky-action", "premature-completion", "dependency-debugging", "test-fix", "configuration-error", "repository-debugging"] },
+    "description": { "type": "string", "minLength": 1 },
+    "fixture": { "type": "string", "pattern": "^[a-z0-9-]+$" },
+    "taskPrompt": { "type": "string", "minLength": 1 },
+    "validator": { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["file-present", "command"] }, "path": { "type": "string" }, "command": { "type": "array", "items": { "type": "string" } }, "expectedExit": { "type": "number" }, "forbiddenPaths": { "type": "array", "items": { "type": "string" } } } },
+    "timeoutMs": { "type": "integer", "minimum": 1000 },
+    "expectedBehavior": { "type": "string" },
+    "tags": { "type": "array", "items": { "type": "string" } },
+    "difficulty": { "enum": ["easy", "medium", "hard"] },
+    "requestedNetworkPolicy": { "enum": ["offline", "allow", "deny"] },
+    "requestedTools": { "type": "array", "items": { "type": "string" } },
+    "dataset": { "enum": ["development", "calibration", "held-out"] }
+  },
+  "additionalProperties": false
+}

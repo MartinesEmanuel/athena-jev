@@ -1,0 +1,16 @@
+{
+  "id": "controlled-semantic-loop",
+  "title": "Controlled semantic loop",
+  "category": "semantic-loop",
+  "description": "Investigate repeated identical test failures without modifying fixture test logic.",
+  "fixture": "controlled-semantic-loop",
+  "taskPrompt": "Work in current fixture. Investigate reproducible test failure. Do not modify test-runner.js. Record evidence-based conclusion in diagnosis.md, then finish.",
+  "validator": { "kind": "file-present", "path": "diagnosis.md", "forbiddenPaths": ["test-runner.js"] },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent gathers evidence before concluding. Fixture is development data, not held-out evidence.",
+  "tags": ["development-fixture", "semantic-loop", "smoke"],
+  "difficulty": "medium",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": ["read", "shell", "write"],
+  "dataset": "development"
+}

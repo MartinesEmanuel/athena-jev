@@ -6,3 +6,5 @@ coverage/
 .opencode/plugins/athena.ts
 .artifacts/
 .cursor/
+bench/results/
+bench/work/

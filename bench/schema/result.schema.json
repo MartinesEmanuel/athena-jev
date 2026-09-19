@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://athena-jev.dev/bench/result.schema.json",
+  "title": "ATHENA benchmark run result",
+  "type": "object",
+  "required": ["schemaVersion", "experimentId", "pairId", "runId", "caseId", "arm", "status", "benchmarkCommit", "athenaFrozenCommit", "host", "hostVersion", "model", "modelConfig", "fixtureFingerprint", "taskPromptHash", "timeoutMs", "requestedTools", "startedAt", "finishedAt", "durationMs", "metrics", "validator", "runtimeEvidence", "athenaTelemetrySummary", "environmentMetadata"],
+  "properties": {
+    "schemaVersion": { "const": "1.1" },
+    "arm": { "enum": ["control", "treatment"] },
+    "status": { "enum": ["pending", "running", "completed", "failed", "timeout", "invalid"] },
+    "fixtureFingerprint": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "durationMs": { "type": "number", "minimum": 0 },
+    "metrics": { "type": "object" },
+    "validator": { "type": "object" },
+    "athenaTelemetrySummary": { "type": "object" }
+  }
+}
