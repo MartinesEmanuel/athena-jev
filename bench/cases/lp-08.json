@@ -1,0 +1,30 @@
+{
+  "id": "lp-08",
+  "title": "Profile transport succeeds but selected fields disappear in the client",
+  "category": "semantic-loop",
+  "description": "Profile transport succeeds but selected fields disappear in the client",
+  "fixture": "lp-08",
+  "taskPrompt": "The profile request succeeds and the server payload contains a name, email, and phone number, but the client result loses some fields while leaving email intact. Restore the documented client profile shape without changing the server payload contract.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-08",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "semantic-loop"
+  ],
+  "difficulty": "hard",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

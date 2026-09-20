@@ -1,0 +1,30 @@
+{
+  "id": "lp-30",
+  "title": "Missing optional configuration branch crashes nested lookup",
+  "category": "mixed-debugging",
+  "description": "Missing optional configuration branch crashes nested lookup",
+  "fixture": "lp-30",
+  "taskPrompt": "Existing configuration paths resolve correctly, including keys whose names contain an escaped dot. Requesting a deeper optional path whose intermediate branch is absent throws instead of returning undefined. Restore safe lookup while preserving the current path syntax and existing values.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-30",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "mixed-debugging"
+  ],
+  "difficulty": "medium",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

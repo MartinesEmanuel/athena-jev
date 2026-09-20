@@ -1,0 +1,30 @@
+{
+  "id": "lp-28",
+  "title": "Batch keeps an older duplicate record",
+  "category": "mixed-debugging",
+  "description": "Batch keeps an older duplicate record",
+  "fixture": "lp-28",
+  "taskPrompt": "When a batch contains multiple updates for the same identifier, processing sometimes keeps an older value instead of the last update from the input stream. Unique records are unaffected. Restore last-update-wins behavior.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-28",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "mixed-debugging"
+  ],
+  "difficulty": "medium",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

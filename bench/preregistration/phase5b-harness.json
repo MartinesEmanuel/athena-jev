@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "1.0",
+  "r3BaselineCommit": "c8b294e56c36d39042fd2b7a89009bca9e8bb4ea",
+  "r3BaselineHarnessFingerprint": "518935b9504b1ca26474e96b402df8b8cfb2db8b8b8c9a220fcc5239309ea008",
+  "phase5bExecutionCommit": "c8b294e56c36d39042fd2b7a89009bca9e8bb4ea",
+  "phase5bExecutionHarnessFingerprint": "899188debb43a4afbf87f7494b554639c46974734c6b2008bf86a085ef5be1d3",
+  "heldoutCorpusFingerprint": "df96ebc611bf518b2df4bdb3e6f90a448599c4c27994c6f2f88095a768a77fd7",
+  "phase5bRunPlanFingerprint": "f815cdd8bbac901b7446702a76a373f40326b82b9fc8d772e9a03fd165fcd7a4",
+  "frozenAthenaCommit": "f7f157a452901153ad98763ecfc610bd0b5803b5",
+  "dockerImage": "athena-bench-shell:latest",
+  "dockerImageId": "sha256:53c63250fce11b423bcfaaff06378cd115b37c8974bc9c9d8839d144ff36c098",
+  "openCodeVersion": "1.18.31",
+  "model": "openai/gpt-5.6-terra",
+  "timeoutMs": 300000
+}

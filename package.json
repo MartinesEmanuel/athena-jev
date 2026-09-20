@@ -17,6 +17,7 @@
     "bench": "node bench/runners/cli.mjs pair",
     "bench:pair": "node bench/runners/cli.mjs pair",
     "bench:experiment": "node bench/runners/cli.mjs experiment",
+    "bench:phase5b": "node bench/runners/cli.mjs phase5b",
     "bench:analyze": "node bench/analysis/summary.mjs",
     "bench:report": "node bench/analysis/report.mjs",
     "release:check": "pnpm check && node packages/cli/dist/index.js demo && node packages/cli/dist/index.js doctor && pnpm --filter @athena/agent-sdk pack --pack-destination ../../.artifacts && pnpm --filter @athena/core pack --pack-destination ../../.artifacts && pnpm --filter @athena/typesafe pack --pack-destination ../../.artifacts && pnpm --filter @athena/opencode pack --pack-destination ../../.artifacts && pnpm --filter @athena/codex pack --pack-destination ../../.artifacts && pnpm --filter ./packages/cli pack --pack-destination ../../.artifacts",

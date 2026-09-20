@@ -1,0 +1,11 @@
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { reproduceFailure } = require("./app");
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), "diag-visible-"));
+const collected = reproduceFailure(dir);
+const artifact = path.join(dir, "artifacts", "errors.log");
+if (!fs.existsSync(artifact)) throw new Error("logger did not write the artifact");
+if (!fs.existsSync(path.join(dir, "manifest.json"))) throw new Error("manifest missing");
+if (!collected || !collected.includes("request failed")) throw new Error("support bundle missed recorded error");
+console.log("PASS");

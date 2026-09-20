@@ -12,13 +12,21 @@ import {
   symlink,
   writeFile,
 } from "node:fs/promises";
-import { tmpdir, homedir } from "node:os";
+import { homedir } from "node:os";
 import { extname, join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 import { createRequire } from "node:module";
 import { spawn, execFile } from "node:child_process";
 import { promisify } from "node:util";
-import { validateRun } from "../validators/index.mjs";
+import { capturePathStates, validateRun } from "../validators/index.mjs";
+import {
+  PHASE5B_MAX_AGENT_RUNS,
+  PHASE5B_MAX_PAIRS,
+  R3_HARNESS_FINGERPRINT,
+  fingerprintHeldoutCorpus,
+  validatePhase5BPlan,
+} from "../preregistration/phase5b-integrity.mjs";
+import { verifyPhase5BExecutionIdentity } from "../preregistration/phase5b-execution-harness.mjs";
 
 const exec = promisify(execFile);
 const root = process.cwd();
@@ -52,6 +60,7 @@ const BENIGN_ACTION = {
 const categories = new Set([
   "semantic-loop",
   "legitimate-progress",
+  "mixed-debugging",
   "risky-action",
   "premature-completion",
   "dependency-debugging",
@@ -149,7 +158,7 @@ export function validateCase(value) {
     !value.tags.every((t) => typeof t === "string" && t)
   )
     fail("case timeout, arrays, difficulty, networkPolicy, or tool items");
-  if (!value.validator || !["file-present", "command"].includes(value.validator.kind))
+  if (!value.validator || !["file-present", "command", "heldout-case"].includes(value.validator.kind))
     fail("validator kind");
   if (value.validator.kind === "file-present" && (typeof value.validator.path !== "string" || !value.validator.path))
     fail("file-present path");
@@ -158,6 +167,8 @@ export function validateCase(value) {
      !Number.isInteger(value.validator.expectedExit) ||
      value.validator.command.some((item) => typeof item !== "string" || !item)))
     fail("command validator");
+  if (value.validator.kind === "heldout-case" && value.validator.caseId !== value.id)
+    fail("heldout-case validator caseId");
   return value;
 }
 export function validateResult(value) {
@@ -430,10 +441,18 @@ async function assembleFrozenRuntime(source, artifactRoot) {
   await link(join(source, "packages", "typesafe", "node_modules", "@typesafe-ai"), join(packages, "typesafe", "node_modules", "@typesafe-ai"));
   await link(join(source, "packages", "opencode", "node_modules", "@opencode", "plugin"), join(packages, "opencode", "node_modules", "@opencode", "plugin"));
 }
-export async function prepareFrozenRuntime({ cacheRoot = join(tmpdir(), FROZEN_RUNTIME_LOGICAL_ROOT) } = {}) {
-  const lockfileFingerprint = sha256(await git(["show", `${FROZEN_ATHENA_COMMIT}:pnpm-lock.yaml`]));
+const frozenRuntimePromises = new Map();
+const frozenLockfileFingerprintP = git(["show", `${FROZEN_ATHENA_COMMIT}:pnpm-lock.yaml`]).then((yaml) => sha256(yaml)).catch(() => "unknown");
+export async function prepareFrozenRuntime({ cacheRoot = join(homedir(), ".cache", FROZEN_RUNTIME_LOGICAL_ROOT) } = {}) {
+  const lockfileFingerprint = await frozenLockfileFingerprintP;
   const nodeMajor = process.versions.node.split(".")[0];
   const cacheKey = `${FROZEN_ATHENA_COMMIT}-node${nodeMajor}-${lockfileFingerprint.slice(0, 16)}`;
+  if (frozenRuntimePromises.has(cacheKey)) return frozenRuntimePromises.get(cacheKey);
+  const promise = doPrepareFrozenRuntime(cacheRoot, cacheKey, lockfileFingerprint);
+  frozenRuntimePromises.set(cacheKey, promise);
+  return promise;
+}
+async function doPrepareFrozenRuntime(cacheRoot, cacheKey, lockfileFingerprint) {
   const cache = join(cacheRoot, cacheKey);
   const source = join(cache, "source");
   const artifactRoot = join(cache, "build");
@@ -827,14 +846,73 @@ export function validatePair(runs) {
   }
   return { pairValid: reasons.length === 0, invalidReasons: reasons };
 }
-export function planExperiment({ caseDefinition, caseDefinitions, replicates, seed, model, timeoutMs, experimentId }) {
+export function planExperiment({ caseDefinition, caseDefinitions, replicates, seed, model, timeoutMs, experimentId, experimentMode }) {
   const cases = caseDefinitions ?? [caseDefinition];
   if (!experimentId) throw new BenchmarkInfrastructureError("experimentId must be created before pair execution");
   if (!cases.length) throw new BenchmarkInfrastructureError("experiment requires at least one case");
+  const pairs = cases.length * replicates;
   const agentRuns = cases.length * replicates * 2;
-  if (replicates > MAX_PAIRS || agentRuns > MAX_AGENT_RUNS) throw new Error(`Run budget exceeded: maxPairs=${MAX_PAIRS}, maxAgentRuns=${MAX_AGENT_RUNS}`);
+  const maxPairs = experimentMode === "phase5b" ? PHASE5B_MAX_PAIRS : MAX_PAIRS;
+  const maxAgentRuns = experimentMode === "phase5b" ? PHASE5B_MAX_AGENT_RUNS : MAX_AGENT_RUNS;
+  assertExperimentBudget({ pairs, agentRuns, maxPairs, maxAgentRuns });
   return { schemaVersion: RESULT_VERSION, experimentId, frozenAthenaCommit: FROZEN_ATHENA_COMMIT, seed, caseId: cases.length === 1 ? cases[0].id : null, model, modelConfig: { model, seedControl: "unsupported", temperature: "unsupported", reasoningEffort: "unsupported" }, timeoutMs, pairs: cases.flatMap((item) => Array.from({ length: replicates }, (_, index) => { const pairId = `${item.id}-r${String(index + 1).padStart(2, "0")}`; const order = orderedArms(seed, index + 1); return { pairId, caseId: item.id, replicate: index + 1, order, runs: order.map((arm) => ({ runId: runId(pairId, arm), arm, status: "pending" })) }; })), agentRuns, maxWallTimeMs: agentRuns * timeoutMs };
 }
+
+export function assertExperimentBudget({ pairs, agentRuns, maxPairs = MAX_PAIRS, maxAgentRuns = MAX_AGENT_RUNS }) {
+  if (!Number.isInteger(pairs) || !Number.isInteger(agentRuns) || pairs < 1 || agentRuns < 1 || pairs > maxPairs || agentRuns > maxAgentRuns) {
+    throw new BenchmarkInfrastructureError(`Run budget exceeded: maxPairs=${maxPairs}, maxAgentRuns=${maxAgentRuns}`);
+  }
+  return { pairs, agentRuns, maxPairs, maxAgentRuns };
+}
+
+export async function loadPhase5BPlan({
+  planPath = join(benchRoot, "preregistration", "phase5b-run-plan.json"),
+  corpusManifestPath = join(benchRoot, "preregistration", "phase5b-corpus.json"),
+  harnessManifestPath = join(benchRoot, "preregistration", "phase5b-harness.json"),
+} = {}) {
+  const [plan, corpusManifest, harnessManifest] = await Promise.all([
+    readFile(planPath, "utf8").then(JSON.parse),
+    readFile(corpusManifestPath, "utf8").then(JSON.parse),
+    readFile(harnessManifestPath, "utf8").then(JSON.parse),
+  ]);
+  const corpusFingerprint = await fingerprintHeldoutCorpus({
+    casesDir: join(benchRoot, "cases"),
+    fixturesDir: fixtureRoot,
+    validatorsDir: join(benchRoot, "validators", "heldout"),
+  });
+  if (corpusManifest.heldoutCorpusFingerprint !== corpusFingerprint) {
+    throw new BenchmarkInfrastructureError("Phase 5B corpus manifest fingerprint mismatch");
+  }
+  if (harnessManifest.r3BaselineHarnessFingerprint !== R3_HARNESS_FINGERPRINT) {
+    throw new BenchmarkInfrastructureError("Phase 5B harness manifest fingerprint mismatch");
+  }
+  const validation = validatePhase5BPlan(plan, {
+    corpusFingerprint,
+    harnessFingerprint: harnessManifest.r3BaselineHarnessFingerprint,
+  });
+  if (!validation.valid) {
+    throw new BenchmarkInfrastructureError(`Phase 5B run plan invalid: ${validation.reasons.join(", ")}`);
+  }
+  return { plan, corpusFingerprint, sequencing: validation.diagnostics };
+}
+
+export async function dryPhase5BPlan() {
+  const { plan, corpusFingerprint, sequencing } = await loadPhase5BPlan();
+  return {
+    cases: new Set(plan.pairs.map((pair) => pair.caseId)).size,
+    replicates: plan.replicates,
+    pairs: plan.totalPairs,
+    runs: plan.totalAgentRuns,
+    ct: plan.ctOrders,
+    tc: plan.tcOrders,
+    corpusFingerprint,
+    sequencing,
+    openCodeProcesses: 0,
+    gptCalls: 0,
+    jevCalls: 0,
+  };
+}
+
 async function existingRuns(resultRoot) {
   const names = await readdir(join(resultRoot, "runs")).catch(() => []);
   return Promise.all(names.filter((name) => name.endsWith(".json")).map(async (name) => JSON.parse(await readFile(join(resultRoot, "runs", name), "utf8"))));
@@ -886,6 +964,16 @@ export function updateManifestRunStatus(manifest, runId, status) {
 }
 export async function prepareExperiment({ experimentPlan, dryRun = false }) {
   if (!experimentPlan) throw new BenchmarkInfrastructureError("prepareExperiment requires pre-created experiment plan");
+  if (experimentPlan.experimentId === "phase5b-held-out") {
+    const { plan } = await loadPhase5BPlan();
+    if (canonicalJson(plan) !== canonicalJson(experimentPlan)) {
+      throw new BenchmarkInfrastructureError("Phase 5B execution must use the frozen preregistered run plan");
+    }
+    if (!dryRun) {
+      const harnessManifest = JSON.parse(await readFile(join(benchRoot, "preregistration", "phase5b-harness.json"), "utf8"));
+      await verifyPhase5BExecutionIdentity({ root, harnessManifest, runPlan: plan });
+    }
+  }
   const caseIds = [...new Set(experimentPlan.pairs.map((pair) => pair.caseId))];
   const caseDefinitions = await Promise.all(caseIds.map(loadCase));
   const differences = await assertFrozenProduction(!dryRun);
@@ -903,7 +991,7 @@ export async function prepareExperiment({ experimentPlan, dryRun = false }) {
   if (!prior) await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
   return { caseDefinitions: new Map(caseDefinitions.map((item) => [item.id, item])), productionRuntime, harnessFingerprint, benchmarkCommit, resultRoot, manifestPath, manifest };
 }
-export async function runPair({ caseId, replicate = 1, seed = 1, timeoutMs, model = DEFAULT_MODEL, dryRun = false, preserve = false, experimentPlan, experimentSetup, confirmLive = false }) {
+export async function runPair({ caseId, replicate = 1, timeoutMs, model = DEFAULT_MODEL, dryRun = false, preserve = false, experimentPlan, experimentSetup, confirmLive = false }) {
   if (!experimentPlan) throw new BenchmarkInfrastructureError("runPair requires pre-created experiment plan");
   if (!dryRun && !confirmLive) throw new BenchmarkInfrastructureError("runPair requires confirmLive: true for live execution");
   const setup = experimentSetup ?? await prepareExperiment({ experimentPlan, dryRun });
@@ -911,7 +999,7 @@ export async function runPair({ caseId, replicate = 1, seed = 1, timeoutMs, mode
   if (!caseDefinition) throw new BenchmarkInfrastructureError(`case absent from experiment plan: ${caseId}`);
   const effectiveTimeout = timeoutMs ?? caseDefinition.timeoutMs;
   const plan = experimentPlan;
-  const pair = plan.pairs.find((item) => item.pairId === `${caseId}-r${String(replicate).padStart(2, "0")}`);
+  const pair = plan.pairs.find((item) => item.caseId === caseId && item.replicate === replicate);
   if (!pair) throw new Error(`Pair absent from experiment plan: replicate ${replicate}`);
   const { productionRuntime, harnessFingerprint, benchmarkCommit, resultRoot, manifestPath, manifest } = setup;
   const source = join(fixtureRoot, caseDefinition.fixture);
@@ -928,7 +1016,7 @@ export async function runPair({ caseId, replicate = 1, seed = 1, timeoutMs, mode
   const completed = [];
   for (const arm of pair.order) {
     const plannedRun = pair.runs.find((run) => run.arm === arm);
-    const runIdentity = { schemaVersion: RESULT_VERSION, experimentId: plan.experimentId, pairId: pair.pairId, arm, caseId, fixtureFingerprint: fingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), caseDefinitionFingerprint: caseDefinitionFingerprint(caseDefinition), host: "OpenCode", hostVersion: version, model, modelConfig: plan.modelConfig, timeoutMs: effectiveTimeout, requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, requestedTools: caseDefinition.requestedTools, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, benchmarkHarnessFingerprint: harnessFingerprint, dataset: caseDefinition.dataset, category: caseDefinition.category, orderSeed: seed, order: pair.order };
+    const runIdentity = { schemaVersion: RESULT_VERSION, experimentId: plan.experimentId, pairId: pair.pairId, arm, caseId, fixtureFingerprint: fingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), caseDefinitionFingerprint: caseDefinitionFingerprint(caseDefinition), host: "OpenCode", hostVersion: version, model, modelConfig: plan.modelConfig, timeoutMs: effectiveTimeout, requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, requestedTools: caseDefinition.requestedTools, athenaFrozenCommit: FROZEN_ATHENA_COMMIT, productionArtifactFingerprint: productionRuntime.productionArtifactFingerprint, benchmarkHarnessFingerprint: harnessFingerprint, dataset: caseDefinition.dataset, category: caseDefinition.category, orderSeed: plan.seed, order: pair.order };
     const existing = findExistingRun(await existingRuns(resultRoot), plan.experimentId, pair.pairId, arm);
     if (existing) { validateResult(existing); assertResumeCompatible(existing, runIdentity); completed.push(existing); continue; }
     updateManifestRunStatus(manifest, plannedRun.runId, "running"); await saveManifest();
@@ -942,7 +1030,7 @@ export async function runPair({ caseId, replicate = 1, seed = 1, timeoutMs, mode
     const runFingerprint = await fingerprintFixture(workspaceRoot);
     if (runFingerprint !== fingerprint) throw new Error(`Fixture fingerprint mismatch for ${arm}`);
     const modelVisibleFingerprint = await modelVisibleInputFingerprint(workspaceRoot);
-    const baselineFiles = new Map(await Promise.all((caseDefinition.validator.forbiddenPaths ?? []).map(async (file) => [file, await readFile(join(workspaceRoot, file), "utf8").catch(() => undefined)])));
+    const baselineFiles = await capturePathStates(workspaceRoot, caseDefinition.validator.forbiddenPaths ?? []);
     const policyConfig = JSON.parse(await readFile(join(hostConfigRoot, "opencode.json"), "utf8"));
     const policyConfigFingerprint = sha256(JSON.stringify(policyConfig));
     const probe = join(probeRoot, "athena-plugin-probe.jsonl");
@@ -1002,7 +1090,7 @@ export async function runPair({ caseId, replicate = 1, seed = 1, timeoutMs, mode
       productionRuntime: productionRuntime.provenance, host: "OpenCode", hostVersion: version, model, modelConfig: plan.modelConfig,
       fixtureFingerprint: runFingerprint, taskPromptHash: promptHash(caseDefinition.taskPrompt), caseDefinitionFingerprint: caseDefinitionFingerprint(caseDefinition),
       timeoutMs: effectiveTimeout, requestedTools: caseDefinition.requestedTools, requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy,
-      benchmarkHarnessFingerprint: harnessFingerprint, dataset: caseDefinition.dataset, category: caseDefinition.category, orderSeed: seed, order: pair.order,
+      benchmarkHarnessFingerprint: harnessFingerprint, dataset: caseDefinition.dataset, category: caseDefinition.category, orderSeed: plan.seed, order: pair.order,
       startedAt, finishedAt: new Date().toISOString(), durationMs,
       termination: { timedOut: execution.timedOut, terminationSignal: execution.terminationSignal ?? null, forcedKill: execution.forcedKill ?? false },
       metrics: { taskSuccess: validator.success, timeToSolutionMs: validator.success ? durationMs : null, toolCalls: actions.length, llmTurns: hostData.llmTurns, meaningfulActions: actions.filter((a) => a.category !== "read").length, failedToolCalls: actions.filter((a) => a.success === false).length, completionStatus: execution.timedOut ? "timeout" : execution.code === 0 ? "agent-exited" : "agent-failed", prematureCompletion: completionDeclaration(host, validator.success), dangerousActionProposed: null, dangerousActionExecuted: null, dangerousActionBlocked: null, ...hostData },
@@ -1010,7 +1098,7 @@ export async function runPair({ caseId, replicate = 1, seed = 1, timeoutMs, mode
       runtimeEvidence, athenaTelemetrySummary: { ...telemetry, rawEvents: undefined },
       environmentMetadata: {
         requestedNetworkPolicy: caseDefinition.requestedNetworkPolicy, networkIsolationVerified: networkVerified,
-        requestedTools: caseDefinition.requestedTools, toolsIsolationVerified: toolIsolation.verified, orderSeed: seed, order: pair.order,
+        requestedTools: caseDefinition.requestedTools, toolsIsolationVerified: toolIsolation.verified, orderSeed: plan.seed, order: pair.order,
         modelVisibleInputFingerprint: modelVisibleFingerprint, modelVisibleEnvironment: modelVisibleEnv,
         toolIsolation, networkIsolation, shellIsolation, stagnationDecisionAudit,
       },

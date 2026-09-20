@@ -1,9 +1,26 @@
 /* global process */
-import { loadCase, planExperiment, prepareExperiment, runPair } from "./index.mjs";
+import { dryPhase5BPlan, loadCase, loadPhase5BPlan, planExperiment, prepareExperiment, runPair } from "./index.mjs";
 
 function options(args) { const output = {}; for (let index = 0; index < args.length; index++) { if (!args[index].startsWith("--")) continue; const key = args[index].slice(2); const next = args[index + 1]; output[key] = !next || next.startsWith("--") ? true : args[++index]; } return output; }
 const [command, ...args] = process.argv.slice(2); const flags = options(args); const caseIds = command === "experiment" ? String(flags.cases ?? "").split(",").filter(Boolean) : flags.case ? [flags.case] : [];
-if (!(["pair", "experiment"].includes(command)) || !caseIds.length) throw new Error("Usage: pnpm bench:experiment --cases <case,case> [--replicates 1] [--seed 1] [--timeout 300000] [--model openai/gpt-5.6-terra] [--dry-run] [--confirm-live]");
+if (command === "phase5b") {
+  const isDryRun = flags["dry-run"] === true;
+  const isConfirmLive = flags["confirm-live"] === true;
+  if (!isDryRun && !isConfirmLive) throw new Error("Phase 5B live benchmark requires --confirm-live. Use phase5b --dry-run for plan validation.");
+  if (isDryRun) {
+    process.stdout.write(`${JSON.stringify({ phase5bDryPlan: await dryPhase5BPlan() }, null, 2)}\n`);
+    process.exit(0);
+  }
+  const { plan } = await loadPhase5BPlan();
+  const setup = await prepareExperiment({ experimentPlan: plan, dryRun: false });
+  const results = [];
+  for (const pair of plan.pairs) {
+    results.push(await runPair({ caseId: pair.caseId, replicate: pair.replicate, seed: plan.seed, timeoutMs: plan.timeoutMs, model: plan.model, experimentPlan: plan, experimentSetup: setup, confirmLive: true }));
+  }
+  process.stdout.write(`${JSON.stringify(results, null, 2)}\n`);
+  process.exit(0);
+}
+if (!(["pair", "experiment"].includes(command)) || !caseIds.length) throw new Error("Usage: pnpm bench:experiment --cases <case,case> [--replicates 1] [--seed 1] [--timeout 300000] [--model openai/gpt-5.6-terra] [--dry-run] [--confirm-live], or pnpm bench:phase5b --dry-run");
 const replicatesRaw = Number(flags.replicates ?? 1);
 const seedRaw = Number(flags.seed ?? 1);
 const timeoutRaw = flags.timeout ? Number(flags.timeout) : undefined;

@@ -1,0 +1,30 @@
+{
+  "id": "lp-01",
+  "title": "Windows deployment path changes after configuration load",
+  "category": "semantic-loop",
+  "description": "Windows deployment path changes after configuration load",
+  "fixture": "lp-01",
+  "taskPrompt": "A Windows deployment starts normally, but the database directory used by the service is not the same path shown in config.ini. The port and other settings load correctly, and a plain-text inspection of the deployment file shows the expected path. Restore the runtime value without changing config.ini or the public service API.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-01",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "semantic-loop"
+  ],
+  "difficulty": "hard",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

@@ -532,7 +532,7 @@ describe("restored runner regressions", () => {
   });
 
   it("escalates a SIGTERM-resistant process to SIGKILL", async () => {
-    const execution = await executeProcess({ command: process.execPath, args: ["--eval", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"], cwd: process.cwd(), timeoutMs: 200, env: process.env });
+    const execution = await executeProcess({ command: "/bin/sh", args: ["-c", "trap '' TERM; while :; do :; done"], cwd: process.cwd(), timeoutMs: 200, env: process.env });
     expect(execution.timedOut).toBe(true);
     expect(execution.terminationSignal).toBe("SIGKILL");
     expect(execution.forcedKill).toBe(true);
@@ -547,7 +547,7 @@ describe("restored runner regressions", () => {
 
   it("records validator SIGKILL escalation", async () => {
     const root = await mkdtemp(join(tmpdir(), "athena-validator-kill-"));
-    const validated = await validateRun({ fixtureRoot: root, runRoot: root, validator: { kind: "command", command: [process.execPath, "--eval", "process.on('SIGTERM', () => {}); setInterval(() => {}, 1000)"], expectedExit: 0 }, baselineFiles: new Map(), timeoutMs: 200 });
+    const validated = await validateRun({ fixtureRoot: root, runRoot: root, validator: { kind: "command", command: ["/bin/sh", "-c", "trap '' TERM; while :; do :; done"], expectedExit: 0 }, baselineFiles: new Map(), timeoutMs: 200 });
     expect(validated.evidence[0].terminationSignal).toBe("SIGKILL");
     expect(validated.evidence[0].forcedKill).toBe(true);
   }, 5_000);

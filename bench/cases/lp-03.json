@@ -1,0 +1,30 @@
+{
+  "id": "lp-03",
+  "title": "Support bundle omits an error that exists on disk",
+  "category": "semantic-loop",
+  "description": "Support bundle omits an error that exists on disk",
+  "fixture": "lp-03",
+  "taskPrompt": "An application error is written successfully, and the diagnostic manifest is produced, but the support bundle reports that no error artifact is available. The failure only appears with the current nested artifact layout. Restore diagnostic collection without moving the artifact or changing the manifest format.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-03",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "semantic-loop"
+  ],
+  "difficulty": "hard",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

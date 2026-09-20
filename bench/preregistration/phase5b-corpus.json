@@ -1,0 +1,192 @@
+{
+  "schemaVersion": "1.0",
+  "heldoutCorpusFingerprint": "df96ebc611bf518b2df4bdb3e6f90a448599c4c27994c6f2f88095a768a77fd7",
+  "totalTasks": 30,
+  "categories": {
+    "legitimate-progress": 12,
+    "mixed-debugging": 6,
+    "semantic-loop": 12
+  },
+  "cases": [
+    {
+      "caseId": "lp-01",
+      "caseDefinitionFingerprint": "e0814094a6dbcea1a8d16ced3ad2deb7784313930b5701a4f18101b680a9761b",
+      "fixtureFingerprint": "6ce6e798033dad4b33dc5127019336697b94559214f45f76adcd8ca8446cfe53",
+      "taskPromptHash": "22497c3d70f851eaee4fc7b5fe14f0d935869756e7d60fd30591b55077aab8c8"
+    },
+    {
+      "caseId": "lp-02",
+      "caseDefinitionFingerprint": "81bb63c3d62dd57aa7679e59e9be705aea90ba1ca35c9c2f4797a491391623a6",
+      "fixtureFingerprint": "a8f215fff4bba49b4b6ec17642b072797d75f1f186a98ee0b64745473501ef3b",
+      "taskPromptHash": "b11e321ab33d09ffa32e7d391c581b8101aacb01846be41458b33b86c4c453a7"
+    },
+    {
+      "caseId": "lp-03",
+      "caseDefinitionFingerprint": "47aa26b73a390ab127bd4441a0bb589ad86945d67ba6f5fca15c3dd24ad19321",
+      "fixtureFingerprint": "3906d041a3e2d453557e0c2f2c05a55f791a8e4bf89adf7ba08e7abaf61df4bd",
+      "taskPromptHash": "c5db2e33ae7688c36aaead3d658fceea96627e26b642dd4ce6a39572fe92e429"
+    },
+    {
+      "caseId": "lp-04",
+      "caseDefinitionFingerprint": "601e3275372b20f0eb1d0913945eb8932ee30b34847a43e938f587d8178f44e6",
+      "fixtureFingerprint": "3663cf76d4b4b6b747b4fa8afe5df9fdff28d1adbbb8a29b33bd2ad1210bf71e",
+      "taskPromptHash": "b6c99e65933aad4982c234f992fcbd8bbc4e9e00a4d14d0ec22b3aa289de83dc"
+    },
+    {
+      "caseId": "lp-05",
+      "caseDefinitionFingerprint": "2b319c80fa8d16abcf35ead65b4813519f30eee1f63dd4601afbcae1a8848e1d",
+      "fixtureFingerprint": "4a9650c5a5838c922693ef1e50ab00ac89078541b2d1552c1bffb919b210d0a7",
+      "taskPromptHash": "378add60ac4900838927792dccdefd9448ececc6ef1d7e6b1a14a1607a9c78c3"
+    },
+    {
+      "caseId": "lp-06",
+      "caseDefinitionFingerprint": "a573a55c98e3ac85b00d193bc507b39a55e45b5b347abbf242f6c4404a5eb404",
+      "fixtureFingerprint": "8b13ca712dc87713adac5be1cfcf9beb915ca09473c7c2e58e891f89b02cc4b3",
+      "taskPromptHash": "51c28607f2397d4ad73d2ca79516f0399c388162dbcc8a121a6fd542c2acfcc8"
+    },
+    {
+      "caseId": "lp-07",
+      "caseDefinitionFingerprint": "a072c412626a1c6532894bb5652f81e9b754b7d661ab45caf1d141ceec544b3d",
+      "fixtureFingerprint": "50df061aa91441763067d5021baf50e7170fc7bebfaf47fe5707e20cd41b84e9",
+      "taskPromptHash": "c18a0417754ba1f90fd2f8aabe8a47fa7c10a5d6c8ea8add7461c0cda3608cc5"
+    },
+    {
+      "caseId": "lp-08",
+      "caseDefinitionFingerprint": "0579992741996a189ad07c1ec4965756cbc28a2e9dc6e1097bb46cbf3c9b2708",
+      "fixtureFingerprint": "437fe8b4b0f21d054da2469e54872ab7085124462a7b72271b99aa7134dce4d1",
+      "taskPromptHash": "49b6aa3873d0e8f6e023e052059a52d4ca4d960593f6cd11a79a98dbd628555d"
+    },
+    {
+      "caseId": "lp-09",
+      "caseDefinitionFingerprint": "6a81705fec4e2179145df2f6827dccaace41a7e78733d7699518200d9a4dd9f1",
+      "fixtureFingerprint": "ff1e663ccff4d67bef420a751452843a09564de6093f4c11544f17db7d3d3e8b",
+      "taskPromptHash": "c81c38d410d68bcf30c3ea6b58a185290dafbbc77aebc26364cb51f4bc8ba6c0"
+    },
+    {
+      "caseId": "lp-10",
+      "caseDefinitionFingerprint": "7e40a83cf5cd7e2b67621cf3b5bc7592cd331c9905ce6be27f757f926877eeb8",
+      "fixtureFingerprint": "9567951e7ed67262f51827f8435f0494d7b65599df0a80db5fe787a299acaa98",
+      "taskPromptHash": "af04100d219a5610735cf0034612f4f461e0790d49370e675947422312b774df"
+    },
+    {
+      "caseId": "lp-11",
+      "caseDefinitionFingerprint": "ba06ae4ac800fa39c56f6536b794c2de9338e2b0ceef07643943ad4eb4fa89db",
+      "fixtureFingerprint": "7d3e9238a946a839774b4a82d0dd2e797bf594f92bbb0b4e93d8d278263c0eb8",
+      "taskPromptHash": "9140096db4f7a5d189b7baa5cb79b7ba333660bdba63feb56bb90d1ffc6d58ab"
+    },
+    {
+      "caseId": "lp-12",
+      "caseDefinitionFingerprint": "fd5364239b12ed74d29f31c6d43e711fd14b38d6a236f76e9b9bb171a94ebfe1",
+      "fixtureFingerprint": "16a2d3f7a1967d67e7a9ee037b8367bae9f6dd5af3a446d13bec723586a00f62",
+      "taskPromptHash": "a71f5fa52edd9a37fe99208c8e39e7b4306b26b82829c48ecc0b6dd3fae72dde"
+    },
+    {
+      "caseId": "lp-13",
+      "caseDefinitionFingerprint": "f7843499734578c68fdfe43a670cfd8b3e0452ee76007013405e0b94815f7439",
+      "fixtureFingerprint": "1a182324d8f861283f4643802ccf5dd33f09659f17da97350403f87ee522315a",
+      "taskPromptHash": "b405b30489c3d2cc9c0b58987bc1a3dcf6002fdb036dd5265a42e0ae8b5b3be3"
+    },
+    {
+      "caseId": "lp-14",
+      "caseDefinitionFingerprint": "aec53cd335c3d1213b712d495a42598b46861281a54236c4d41e826f7d267048",
+      "fixtureFingerprint": "26145da4b96142f95ec35ba0ecd80de596e83d0ef96ffee6d46bb89e53f3a67c",
+      "taskPromptHash": "02f022ab1c275333f92ddc9a16fba27aa0e87198a359faf1c4d6c8ddde5fb11d"
+    },
+    {
+      "caseId": "lp-15",
+      "caseDefinitionFingerprint": "521604e3a2d5afe1eda341b2a7c4756bd93ccf53a2256d5b56a3015c5654a50e",
+      "fixtureFingerprint": "966125f7e463f335ab93fa459704de2049852934ec91f53d0d174d11fcb0a345",
+      "taskPromptHash": "5e8ac9bd13231881af3ae21ec2a7f0eff0cbd2a2697686e3d5b74ed991e6d375"
+    },
+    {
+      "caseId": "lp-16",
+      "caseDefinitionFingerprint": "0ccaec02cf93e2a6c70c447cab0380a90605ff47ab503df63e39f0a5e0e3d33d",
+      "fixtureFingerprint": "ed2cab47a3565385111d99da46ef33a0e4942b16d8e5de2c186c235d54a93855",
+      "taskPromptHash": "ba9da2e2cc25f3e26ef75fabdbe801fbf42e39694d9d663807f053fd604ed9bf"
+    },
+    {
+      "caseId": "lp-17",
+      "caseDefinitionFingerprint": "190ffda4a45da575eef9af1804f9337ae7a33e3beb21ec1ecee526932c015ea1",
+      "fixtureFingerprint": "e64d46b4162b0b49211a78723a57388595c6b5da8296398d7b6a5e6748d57921",
+      "taskPromptHash": "1b6d12b470dd5a9928aee68611c9d5a54a3f94c31a124b42201e9cc48a03a28b"
+    },
+    {
+      "caseId": "lp-18",
+      "caseDefinitionFingerprint": "afe6190d617c47c179cf228c61da7620ce344e5ffa3c560d8c1de3df97665902",
+      "fixtureFingerprint": "2ce7c6324400c216907728064e7f1a54104fb818bdba260b18339864aae7fcf0",
+      "taskPromptHash": "03fd50a2eb74366dcf6b45f4cff2290a992072601705b0506d82e9b2f8ce06f0"
+    },
+    {
+      "caseId": "lp-19",
+      "caseDefinitionFingerprint": "417aed25d1596aeabef8098d16560a20e79a7f1a11b6e8887b2f30d23d1dd795",
+      "fixtureFingerprint": "a6e25ce8f2ef0e90927c551a9c2e245fa1ef2c5a8f2fde8346699c5c2c756374",
+      "taskPromptHash": "d5b83b4fd8214a8a8091cccf8a53f59f3fa893a2a4773e80cff802db5222e314"
+    },
+    {
+      "caseId": "lp-20",
+      "caseDefinitionFingerprint": "4668a2b38ccf91708f89c8c4a8298cae7c089c57042eb7a0d415446cb6e1e0a0",
+      "fixtureFingerprint": "980244446582976129bf45124655153ec79b7939bd5b2e37a4d139e30483a900",
+      "taskPromptHash": "ba821093f2b8cac3bcf6c80091775aa328f8e295829ea55a78e2efb8d2414e59"
+    },
+    {
+      "caseId": "lp-21",
+      "caseDefinitionFingerprint": "0c6fb246456754fae1cca1ad554b76e1b473dda22167aab25d07a6467373fc6d",
+      "fixtureFingerprint": "7abc6d49974222876de6b9486655885dd2cbb5f683dff79709f5b1af3b35bfca",
+      "taskPromptHash": "19ef38cb1635c4fd582e3d6938f4a655bce279068bcaaf66cc328237da4decd3"
+    },
+    {
+      "caseId": "lp-22",
+      "caseDefinitionFingerprint": "e34af35e245cf6c93c0ffe567bd44271b28e347976e27d535d61e43a12950d67",
+      "fixtureFingerprint": "b833ba6cbee101d10a2040cbcd700705d1e9bc52737308aea6973950e2741317",
+      "taskPromptHash": "ff711a93b8bd760481fbdf9c04e22d6dc1b4ae54cfa3f7edbba0af28cd2bbf70"
+    },
+    {
+      "caseId": "lp-23",
+      "caseDefinitionFingerprint": "35d9029fc5143cc0199a44d6f4d82fb4418e5eaff4abdf323538e97637e2292c",
+      "fixtureFingerprint": "053e5cc5c38382b0694f4e0a3b4927c6b339dd6eead6c31f8cbf5fda6a93c4e1",
+      "taskPromptHash": "819c59eaa4ccc5a7a0af7f8fd62edbc8897bd98617fd2e9b55ec0c27386f7fac"
+    },
+    {
+      "caseId": "lp-24",
+      "caseDefinitionFingerprint": "0aaa5a205e8fcc2a7ec88eee84ecc7034cfe613ea91b9a78f239b02f07b5919f",
+      "fixtureFingerprint": "44ea50e6104909499de5f8741d132297633d2a8ee9d1b66a0cd5a5e9ebb5118a",
+      "taskPromptHash": "24347bc96718a80214d7e0de5fa9bdaebe0209fac204c4b8b4a2fef9eef04248"
+    },
+    {
+      "caseId": "lp-25",
+      "caseDefinitionFingerprint": "ee6460e62393567a3270630997e1f72d907b6d6db81b3478ff46948a7b4cc1e6",
+      "fixtureFingerprint": "35245e955bc3c0800e19f8a3447b71f5652ec04608a32eb7867fcbcc183ef6de",
+      "taskPromptHash": "17a66340302e497cee0104b23bddf2f1b772a383ea01a8746ed1f81ab5c4df4d"
+    },
+    {
+      "caseId": "lp-26",
+      "caseDefinitionFingerprint": "6369d63b396bd6b22552cb480c65af1aafbc5963b72473fb21fb6872c586ac99",
+      "fixtureFingerprint": "84f89372405c84fe7c729788a79885918681fb5250dd4e32423db2c869c861ad",
+      "taskPromptHash": "0ba98fadbf222affa40b808805c12549121968dc3d0bd62a82aa992cb2b3afb5"
+    },
+    {
+      "caseId": "lp-27",
+      "caseDefinitionFingerprint": "57598f87ecf70b8f85f8abe5137eb10a6ca1e7d05157d8becfc2acbb4650eef1",
+      "fixtureFingerprint": "b7f82172cf14aad2a2989905baad203a16ee85a9b48474beedd965f9fe4ccdb8",
+      "taskPromptHash": "7b55643db91b440bdbbf0aeabd8dd921f64b1c67984713ac2c4ee75ac30d5960"
+    },
+    {
+      "caseId": "lp-28",
+      "caseDefinitionFingerprint": "ce887696c31f13616ffdd6190fdf2ca853319f7135b797b3030b0226705f9879",
+      "fixtureFingerprint": "adc0fdfa67bace8d6b4bfdecfd4cede4f262677fb21bf5c0677daebce2dedfd0",
+      "taskPromptHash": "14fb4457c31ed0a28c12470233737fceffdb55d5d940075976ec65e4d820009f"
+    },
+    {
+      "caseId": "lp-29",
+      "caseDefinitionFingerprint": "16df6cec0243c03d9834b1e14c1755686f084a3b5b2d7b61d6598d89576fcd71",
+      "fixtureFingerprint": "086847a0dfab1f4234b6057be4dd896143962656294ac8cce9825481e8be1bc1",
+      "taskPromptHash": "8c07d753af12c9d67bf60ac10025fdd1de4c06e655bc34a8a122fd8dd287856a"
+    },
+    {
+      "caseId": "lp-30",
+      "caseDefinitionFingerprint": "d32af8ae96b546b83a65acc0c1067ee7d864fe6d2b5e8cbb229a88d7749b9750",
+      "fixtureFingerprint": "c17558546c27f6efb85f58bcd0746792498da28ff20027b520fb350daf703257",
+      "taskPromptHash": "c52f5a4ce6ed9babfef9147316d397ff48a703796e9c61161c6c9ebde7dbe078"
+    }
+  ]
+}

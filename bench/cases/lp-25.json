@@ -1,0 +1,30 @@
+{
+  "id": "lp-25",
+  "title": "Valid request is processed but no response reaches the caller",
+  "category": "mixed-debugging",
+  "description": "Valid request is processed but no response reaches the caller",
+  "fixture": "lp-25",
+  "taskPrompt": "A valid request passes header validation and the handler is invoked, but the caller receives no response object. Invalid requests are still rejected correctly. Restore the valid-request result without changing the handler contract.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-25",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "mixed-debugging"
+  ],
+  "difficulty": "medium",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

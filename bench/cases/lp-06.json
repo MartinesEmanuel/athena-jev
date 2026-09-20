@@ -1,0 +1,30 @@
+{
+  "id": "lp-06",
+  "title": "Lifecycle stages all execute but safety order is reversed",
+  "category": "semantic-loop",
+  "description": "Lifecycle stages all execute but safety order is reversed",
+  "fixture": "lp-06",
+  "taskPrompt": "A commit lifecycle runs all configured stages, but audit output shows notify before persist and persist before validate. The same event utility is used elsewhere, so restore the documented ordering semantics while preserving its public registration API.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-06",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "semantic-loop"
+  ],
+  "difficulty": "hard",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

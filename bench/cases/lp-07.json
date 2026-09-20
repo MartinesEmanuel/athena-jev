@@ -1,0 +1,30 @@
+{
+  "id": "lp-07",
+  "title": "Retried delivery mutates state twice",
+  "category": "semantic-loop",
+  "description": "Retried delivery mutates state twice",
+  "fixture": "lp-07",
+  "taskPrompt": "When the same delivery is retried with the same message identifier, account state can be applied twice even though logs show the duplicate identifier. Restore idempotent processing while preserving the first delivery.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-07",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "semantic-loop"
+  ],
+  "difficulty": "hard",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "lp-10",
+  "title": "A fresh zero sensor reading is replaced by an older fallback",
+  "category": "semantic-loop",
+  "description": "A fresh zero sensor reading is replaced by an older fallback",
+  "fixture": "lp-10",
+  "taskPrompt": "A resolver prefers the current sensor when it has a reading and uses a fallback only when the current source is unavailable. Normal positive readings work, but a legitimate zero is replaced by an older fallback value. Restore source selection without changing provider return shapes.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-10",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "semantic-loop"
+  ],
+  "difficulty": "hard",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

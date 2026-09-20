@@ -1,0 +1,30 @@
+{
+  "id": "lp-27",
+  "title": "Cache hit rate drifts when the measurement window starts after prior traffic",
+  "category": "mixed-debugging",
+  "description": "Cache hit rate drifts when the measurement window starts after prior traffic",
+  "fixture": "lp-27",
+  "taskPrompt": "The cache returns correct values, and the dashboard hit percentage is correct immediately after startup. If the cache handled traffic before a new measurement window begins, the percentage for that window becomes wrong. Restore the windowed metric without clearing the cache or changing retrieval behavior.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-27",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "mixed-debugging"
+  ],
+  "difficulty": "medium",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

@@ -1,0 +1,30 @@
+{
+  "id": "lp-11",
+  "title": "Startup chooses an older snapshot after revision numbers reach two digits",
+  "category": "semantic-loop",
+  "description": "Startup chooses an older snapshot after revision numbers reach two digits",
+  "fixture": "lp-11",
+  "taskPrompt": "Startup selects the newest snapshot correctly for earlier revisions, but after the repository reached two-digit revision numbers it can load an older snapshot even though the new file is present. Restore newest-snapshot selection without renaming snapshot files or relying on directory listing order.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-11",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "semantic-loop"
+  ],
+  "difficulty": "hard",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

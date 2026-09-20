@@ -1,0 +1,30 @@
+{
+  "id": "lp-02",
+  "title": "Usage averages drift when a batch contains unfinished observations",
+  "category": "semantic-loop",
+  "description": "Usage averages drift when a batch contains unfinished observations",
+  "fixture": "lp-02",
+  "taskPrompt": "A usage report is accurate for batches made entirely of completed observations, but its average becomes too low when unfinished observations are present. The incoming values and statuses look reasonable, and the report count must continue to describe the full transport batch. Restore the documented average: only completed numeric observations belong to the averaging population.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-02",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "semantic-loop"
+  ],
+  "difficulty": "hard",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

@@ -7,11 +7,11 @@
   "properties": {
     "id": { "type": "string", "pattern": "^[a-z0-9-]+$" },
     "title": { "type": "string", "minLength": 1 },
-    "category": { "enum": ["semantic-loop", "legitimate-progress", "risky-action", "premature-completion", "dependency-debugging", "test-fix", "configuration-error", "repository-debugging"] },
+    "category": { "enum": ["semantic-loop", "legitimate-progress", "mixed-debugging", "risky-action", "premature-completion", "dependency-debugging", "test-fix", "configuration-error", "repository-debugging"] },
     "description": { "type": "string", "minLength": 1 },
     "fixture": { "type": "string", "pattern": "^[a-z0-9-]+$" },
     "taskPrompt": { "type": "string", "minLength": 1 },
-    "validator": { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["file-present", "command"] }, "path": { "type": "string" }, "command": { "type": "array", "items": { "type": "string" } }, "expectedExit": { "type": "number" }, "forbiddenPaths": { "type": "array", "items": { "type": "string" } } } },
+    "validator": { "type": "object", "required": ["kind"], "properties": { "kind": { "enum": ["file-present", "command", "heldout-case"] }, "caseId": { "type": "string", "pattern": "^lp-\\d\\d$" }, "path": { "type": "string" }, "command": { "type": "array", "items": { "type": "string" } }, "expectedExit": { "type": "number" }, "forbiddenPaths": { "type": "array", "items": { "type": "string" } } } },
     "timeoutMs": { "type": "integer", "minimum": 1000 },
     "expectedBehavior": { "type": "string" },
     "tags": { "type": "array", "items": { "type": "string" } },

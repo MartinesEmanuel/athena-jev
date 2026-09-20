@@ -1,0 +1,30 @@
+{
+  "id": "lp-29",
+  "title": "Default user lookup returns an internal identifier shape",
+  "category": "mixed-debugging",
+  "description": "Default user lookup returns an internal identifier shape",
+  "fixture": "lp-29",
+  "taskPrompt": "User lookup finds the correct stored record, but the default consumer-facing response does not contain the documented userId field. Explicit internal-mode diagnostics still need their existing identifier shape. Restore the default response contract without changing stored records.",
+  "validator": {
+    "kind": "heldout-case",
+    "caseId": "lp-29",
+    "forbiddenPaths": [
+      ".athena/config.json",
+      ".opencode"
+    ]
+  },
+  "timeoutMs": 300000,
+  "expectedBehavior": "Agent completes the requested behavior and passes independent hidden validation",
+  "tags": [
+    "held-out",
+    "mixed-debugging"
+  ],
+  "difficulty": "medium",
+  "requestedNetworkPolicy": "offline",
+  "requestedTools": [
+    "read",
+    "shell",
+    "write"
+  ],
+  "dataset": "held-out"
+}

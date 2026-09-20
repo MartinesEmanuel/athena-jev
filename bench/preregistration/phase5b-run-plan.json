@@ -1,0 +1,1910 @@
+{
+  "schemaVersion": "1.0",
+  "experimentId": "phase5b-held-out",
+  "seed": 42,
+  "replicates": 3,
+  "totalPairs": 90,
+  "totalAgentRuns": 180,
+  "ctOrders": 45,
+  "tcOrders": 45,
+  "corpusFingerprint": "df96ebc611bf518b2df4bdb3e6f90a448599c4c27994c6f2f88095a768a77fd7",
+  "r3HarnessFingerprint": "518935b9504b1ca26474e96b402df8b8cfb2db8b8b8c9a220fcc5239309ea008",
+  "model": "openai/gpt-5.6-terra",
+  "timeoutMs": 300000,
+  "sequencing": {
+    "ctTcTransitions": 54,
+    "longestSameOrderStreak": 5
+  },
+  "pairs": [
+    {
+      "pairId": "phase5b-lp-22-r02",
+      "caseId": "lp-22",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-22-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-22-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-05-r02",
+      "caseId": "lp-05",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-05-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-05-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-20-r03",
+      "caseId": "lp-20",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-20-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-20-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-06-r02",
+      "caseId": "lp-06",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-06-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-06-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-23-r02",
+      "caseId": "lp-23",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-23-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-23-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-04-r03",
+      "caseId": "lp-04",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-04-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-04-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-08-r01",
+      "caseId": "lp-08",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-08-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-08-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-15-r03",
+      "caseId": "lp-15",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-15-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-15-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-05-r03",
+      "caseId": "lp-05",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-05-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-05-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-27-r01",
+      "caseId": "lp-27",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-27-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-27-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-30-r02",
+      "caseId": "lp-30",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-30-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-30-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-12-r03",
+      "caseId": "lp-12",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-12-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-12-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-28-r01",
+      "caseId": "lp-28",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-28-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-28-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-26-r01",
+      "caseId": "lp-26",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-26-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-26-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-10-r03",
+      "caseId": "lp-10",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-10-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-10-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-12-r02",
+      "caseId": "lp-12",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-12-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-12-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-16-r03",
+      "caseId": "lp-16",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-16-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-16-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-09-r01",
+      "caseId": "lp-09",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-09-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-09-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-19-r03",
+      "caseId": "lp-19",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-19-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-19-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-15-r01",
+      "caseId": "lp-15",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-15-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-15-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-14-r03",
+      "caseId": "lp-14",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-14-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-14-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-14-r02",
+      "caseId": "lp-14",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-14-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-14-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-21-r02",
+      "caseId": "lp-21",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-21-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-21-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-29-r03",
+      "caseId": "lp-29",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-29-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-29-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-08-r03",
+      "caseId": "lp-08",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-08-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-08-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-29-r01",
+      "caseId": "lp-29",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-29-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-29-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-09-r03",
+      "caseId": "lp-09",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-09-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-09-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-21-r01",
+      "caseId": "lp-21",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-21-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-21-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-16-r02",
+      "caseId": "lp-16",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-16-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-16-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-26-r03",
+      "caseId": "lp-26",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-26-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-26-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-07-r01",
+      "caseId": "lp-07",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-07-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-07-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-10-r01",
+      "caseId": "lp-10",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-10-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-10-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-25-r03",
+      "caseId": "lp-25",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-25-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-25-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-29-r02",
+      "caseId": "lp-29",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-29-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-29-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-11-r01",
+      "caseId": "lp-11",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-11-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-11-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-27-r02",
+      "caseId": "lp-27",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-27-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-27-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-19-r02",
+      "caseId": "lp-19",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-19-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-19-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-01-r01",
+      "caseId": "lp-01",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-01-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-01-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-25-r02",
+      "caseId": "lp-25",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-25-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-25-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-03-r03",
+      "caseId": "lp-03",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-03-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-03-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-06-r01",
+      "caseId": "lp-06",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-06-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-06-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-15-r02",
+      "caseId": "lp-15",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-15-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-15-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-09-r02",
+      "caseId": "lp-09",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-09-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-09-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-12-r01",
+      "caseId": "lp-12",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-12-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-12-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-02-r03",
+      "caseId": "lp-02",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-02-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-02-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-19-r01",
+      "caseId": "lp-19",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-19-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-19-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-24-r02",
+      "caseId": "lp-24",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-24-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-24-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-02-r02",
+      "caseId": "lp-02",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-02-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-02-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-30-r03",
+      "caseId": "lp-30",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-30-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-30-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-17-r02",
+      "caseId": "lp-17",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-17-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-17-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-18-r01",
+      "caseId": "lp-18",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-18-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-18-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-22-r03",
+      "caseId": "lp-22",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-22-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-22-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-13-r01",
+      "caseId": "lp-13",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-13-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-13-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-20-r02",
+      "caseId": "lp-20",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-20-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-20-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-07-r03",
+      "caseId": "lp-07",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-07-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-07-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-25-r01",
+      "caseId": "lp-25",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-25-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-25-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-20-r01",
+      "caseId": "lp-20",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-20-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-20-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-17-r01",
+      "caseId": "lp-17",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-17-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-17-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-11-r02",
+      "caseId": "lp-11",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-11-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-11-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-01-r02",
+      "caseId": "lp-01",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-01-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-01-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-02-r01",
+      "caseId": "lp-02",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-02-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-02-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-10-r02",
+      "caseId": "lp-10",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-10-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-10-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-18-r02",
+      "caseId": "lp-18",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-18-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-18-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-28-r02",
+      "caseId": "lp-28",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-28-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-28-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-18-r03",
+      "caseId": "lp-18",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-18-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-18-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-21-r03",
+      "caseId": "lp-21",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-21-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-21-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-06-r03",
+      "caseId": "lp-06",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-06-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-06-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-28-r03",
+      "caseId": "lp-28",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-28-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-28-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-05-r01",
+      "caseId": "lp-05",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-05-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-05-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-13-r03",
+      "caseId": "lp-13",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-13-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-13-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-22-r01",
+      "caseId": "lp-22",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-22-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-22-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-26-r02",
+      "caseId": "lp-26",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-26-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-26-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-24-r01",
+      "caseId": "lp-24",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-24-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-24-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-04-r02",
+      "caseId": "lp-04",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-04-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-04-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-03-r01",
+      "caseId": "lp-03",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-03-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-03-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-16-r01",
+      "caseId": "lp-16",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-16-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-16-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-23-r01",
+      "caseId": "lp-23",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-23-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-23-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-30-r01",
+      "caseId": "lp-30",
+      "replicate": 1,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-30-r01-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-30-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-14-r01",
+      "caseId": "lp-14",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-14-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-14-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-23-r03",
+      "caseId": "lp-23",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-23-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-23-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-27-r03",
+      "caseId": "lp-27",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-27-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-27-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-24-r03",
+      "caseId": "lp-24",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-24-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-24-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-04-r01",
+      "caseId": "lp-04",
+      "replicate": 1,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-04-r01-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-04-r01-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-13-r02",
+      "caseId": "lp-13",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-13-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-13-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-01-r03",
+      "caseId": "lp-01",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-01-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-01-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-11-r03",
+      "caseId": "lp-11",
+      "replicate": 3,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-11-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-11-r03-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-07-r02",
+      "caseId": "lp-07",
+      "replicate": 2,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-07-r02-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-07-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-17-r03",
+      "caseId": "lp-17",
+      "replicate": 3,
+      "order": [
+        "control",
+        "treatment"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-17-r03-control",
+          "arm": "control",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-17-r03-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-03-r02",
+      "caseId": "lp-03",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-03-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-03-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    },
+    {
+      "pairId": "phase5b-lp-08-r02",
+      "caseId": "lp-08",
+      "replicate": 2,
+      "order": [
+        "treatment",
+        "control"
+      ],
+      "runs": [
+        {
+          "runId": "phase5b-lp-08-r02-treatment",
+          "arm": "treatment",
+          "status": "pending"
+        },
+        {
+          "runId": "phase5b-lp-08-r02-control",
+          "arm": "control",
+          "status": "pending"
+        }
+      ]
+    }
+  ]
+}
