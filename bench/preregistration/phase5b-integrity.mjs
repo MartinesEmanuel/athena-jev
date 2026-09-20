@@ -20,7 +20,7 @@ async function sortedFiles(root, prefix = "") {
   const entries = await readdir(root, { withFileTypes: true });
   const output = [];
   for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
-    if ([".git", ".athena", ".opencode", "node_modules"].includes(entry.name)) continue;
+    if ([".git", ".athena", ".opencode", "node_modules", "dist"].includes(entry.name)) continue;
     const path = join(root, entry.name);
     const logicalPath = join(prefix, entry.name);
     if (entry.isDirectory()) output.push(...await sortedFiles(path, logicalPath));

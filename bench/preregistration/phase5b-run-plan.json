@@ -7,7 +7,7 @@
   "totalAgentRuns": 180,
   "ctOrders": 45,
   "tcOrders": 45,
-  "corpusFingerprint": "df96ebc611bf518b2df4bdb3e6f90a448599c4c27994c6f2f88095a768a77fd7",
+  "corpusFingerprint": "99b28a20f43b49be3e5f139b9f85594ef9275d699d973d2450d6adade9a66458",
   "r3HarnessFingerprint": "518935b9504b1ca26474e96b402df8b8cfb2db8b8b8c9a220fcc5239309ea008",
   "model": "openai/gpt-5.6-terra",
   "timeoutMs": 300000,
