@@ -27,6 +27,7 @@ import {
   manifestCompatibility,
   mergeTrace,
   modelVisibleInputFingerprint,
+  phase5BTreatmentConfig,
   loadCase,
   parseHostTrace,
   planExperiment,
@@ -131,6 +132,27 @@ describe("A: treatment ATHENA files absent from workspace", () => {
     const ws = join(root, "ws"); const cfg = join(root, "cfg"); const ath = join(root, "ath");
     await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "treatment", workspaceRoot: ws, hostConfigRoot: cfg, athenaStateRoot: ath, productionRuntime: frozen });
     await expect(access(join(ws, ".athena"))).rejects.toThrow();
+  });
+});
+
+describe("Phase 5B treatment configuration", () => {
+  it("prepares lp-22 without fixture ATHENA config from canonical benchmark infrastructure", async () => {
+    const root = await mkdtemp(join(tmpdir(), "athena-phase5b-config-"));
+    const fixture = join(process.cwd(), "evals", "fixtures", "lp-22");
+    const frozen = await prepareFrozenRuntime();
+    const controlWorkspace = join(root, "control-workspace"); const treatmentWorkspace = join(root, "treatment-workspace");
+    const controlConfig = join(root, "control-config"); const treatmentConfig = join(root, "treatment-config");
+    const controlState = join(root, "control-state"); const treatmentState = join(root, "treatment-state");
+    const fixtureFingerprint = await modelVisibleInputFingerprint(fixture);
+    await expect(access(join(fixture, ".athena", "config.json"))).rejects.toThrow();
+    await prepareArm({ caseDefinition: { fixture: "lp-22", requestedTools: ["read", "shell", "write"] }, arm: "control", workspaceRoot: controlWorkspace, hostConfigRoot: controlConfig, athenaStateRoot: controlState });
+    await prepareArm({ caseDefinition: { fixture: "lp-22", requestedTools: ["read", "shell", "write"] }, arm: "treatment", workspaceRoot: treatmentWorkspace, hostConfigRoot: treatmentConfig, athenaStateRoot: treatmentState, productionRuntime: frozen });
+    const canonical = await phase5BTreatmentConfig();
+    expect(JSON.parse(await readFile(join(treatmentState, ".athena", "config.json"), "utf8"))).toEqual(canonical.config);
+    await expect(access(join(controlState, ".athena", "config.json"))).rejects.toThrow();
+    expect(await modelVisibleInputFingerprint(controlWorkspace)).toBe(await modelVisibleInputFingerprint(treatmentWorkspace));
+    expect(await modelVisibleInputFingerprint(fixture)).toBe(fixtureFingerprint);
+    await expect(access(join(fixture, ".athena", "config.json"))).rejects.toThrow();
   });
 });
 

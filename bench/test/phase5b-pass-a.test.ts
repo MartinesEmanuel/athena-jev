@@ -187,9 +187,9 @@ describe("Phase 5B Pass A execution integrity", () => {
     expect(fingerprintPhase5BRunPlan({ ...first, pairs: [{ ...first.pairs[0], order: ["treatment", "control"] }] })).not.toBe(fingerprintPhase5BRunPlan(first));
   });
 
-  it("dry plan performs no model execution", async () => {
-    await expect(dryPhase5BPlan()).resolves.toMatchObject({ cases: 30, replicates: 3, pairs: 90, runs: 180, ct: 45, tc: 45, openCodeProcesses: 0, gptCalls: 0, jevCalls: 0 });
-  });
+  it("dry plan performs all pre-agent preparation without model execution", async () => {
+    await expect(dryPhase5BPlan()).resolves.toMatchObject({ cases: 30, replicates: 3, pairs: 90, runs: 180, ct: 45, tc: 45, openCodeProcesses: 0, gptCalls: 0, jevCalls: 0, preflight: { cases: 30, pairs: 90, treatmentPreparations: 90, controlPreparations: 90, gptCalls: 0, jevCalls: 0, resultArtifacts: 0 } });
+  }, 1_200_000);
 
   it("detects protected file and directory state changes", async () => {
     const root = await mkdtemp(join(tmpdir(), "phase5b-protected-"));

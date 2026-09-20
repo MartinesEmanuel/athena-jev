@@ -1,6 +1,7 @@
 /* global process, setTimeout, clearTimeout */
 import { createHash } from "node:crypto";
 import {
+  access,
   cp,
   mkdir,
   mkdtemp,
@@ -38,6 +39,7 @@ const MAX_PAIRS = 10;
 const MAX_AGENT_RUNS = 20;
 export const FROZEN_ATHENA_COMMIT = "f7f157a452901153ad98763ecfc610bd0b5803b5";
 const FROZEN_RUNTIME_PACKAGES = ["core", "typesafe", "opencode"];
+const PHASE5B_ATHENA_CONFIG_PATH = join(benchRoot, "runners", "phase5b-athena-config.json");
 const DOCKER_IMAGE_NAME = "athena-bench-shell:latest";
 const DOCKER_IMAGE_ID = "sha256:53c63250fce11b423bcfaaff06378cd115b37c8974bc9c9d8839d144ff36c098";
 const FROZEN_RUNTIME_LOGICAL_ROOT = "athena-bench-frozen";
@@ -496,6 +498,18 @@ export function generateOpenCodeConfig(requestedTools) {
   }
   return { permission };
 }
+export async function phase5BTreatmentConfig() {
+  let raw;
+  try { raw = await readFile(PHASE5B_ATHENA_CONFIG_PATH, "utf8"); }
+  catch (error) { throw new BenchmarkInfrastructureError("canonical Phase 5B treatment ATHENA config unavailable", error); }
+  try {
+    const config = JSON.parse(raw);
+    if (config.mode !== "balanced" || config.provider !== "typesafe") throw new Error("expected balanced TypeSafe configuration");
+    return { raw, config };
+  } catch (error) {
+    throw new BenchmarkInfrastructureError("canonical Phase 5B treatment ATHENA config malformed", error);
+  }
+}
 export async function prepareArm({ caseDefinition, arm, workspaceRoot, hostConfigRoot, athenaStateRoot, productionRuntime }) {
   const source = join(fixtureRoot, caseDefinition.fixture);
   await copyFixture(source, workspaceRoot);
@@ -505,8 +519,8 @@ export async function prepareArm({ caseDefinition, arm, workspaceRoot, hostConfi
   await writeFile(join(hostConfigRoot, "opencode.json"), `${JSON.stringify(config, null, 2)}\n`);
   if (arm === "control") return;
   await mkdir(join(athenaStateRoot, ".athena"), { recursive: true });
-  const athenaConfig = await readFile(join(source, ".athena", "config.json"), "utf8");
-  await writeFile(join(athenaStateRoot, ".athena", "config.json"), athenaConfig);
+  const athenaConfig = await phase5BTreatmentConfig();
+  await writeFile(join(athenaStateRoot, ".athena", "config.json"), athenaConfig.raw);
   if (!productionRuntime?.entrypoint) throw new BenchmarkInfrastructureError("treatment requires prepared frozen runtime");
   await assertFrozenRuntimeGraph(resolve(productionRuntime.entrypoint, "..", "..", "..", ".."));
   const adapter = pathToFileURL(productionRuntime.entrypoint).href;
@@ -897,6 +911,7 @@ export async function loadPhase5BPlan({
 }
 
 export async function dryPhase5BPlan() {
+  const preflight = await preflightPhase5B();
   const { plan, corpusFingerprint, sequencing } = await loadPhase5BPlan();
   return {
     cases: new Set(plan.pairs.map((pair) => pair.caseId)).size,
@@ -910,7 +925,60 @@ export async function dryPhase5BPlan() {
     openCodeProcesses: 0,
     gptCalls: 0,
     jevCalls: 0,
+    preflight,
   };
+}
+
+export async function preflightPhase5B() {
+  const { plan } = await loadPhase5BPlan();
+  await assertFrozenProduction(false);
+  const productionRuntime = await prepareFrozenRuntime();
+  const caseDefinitions = new Map(await Promise.all([...new Set(plan.pairs.map((pair) => pair.caseId))].map(async (caseId) => {
+    const caseDefinition = await loadCase(caseId);
+    if (caseDefinition.validator.kind === "heldout-case") {
+      try { await access(join(benchRoot, "validators", "heldout", "validate-case.mjs")); }
+      catch (error) { throw new BenchmarkInfrastructureError(`held-out validator unavailable for ${caseId}`, error); }
+    }
+    return [caseId, caseDefinition];
+  })));
+  let treatmentPreparations = 0;
+  let controlPreparations = 0;
+  for (const pair of plan.pairs) {
+    const caseDefinition = caseDefinitions.get(pair.caseId);
+    const workRoot = await mkdtemp(join(homedir(), "athena-preflight-"));
+    try {
+      const controlWorkspace = join(workRoot, "control-workspace");
+      const treatmentWorkspace = join(workRoot, "treatment-workspace");
+      const controlConfig = join(workRoot, "control-config");
+      const treatmentConfig = join(workRoot, "treatment-config");
+      const controlState = join(workRoot, "control-state");
+      const treatmentState = join(workRoot, "treatment-state");
+      await prepareArm({ caseDefinition, arm: "control", workspaceRoot: controlWorkspace, hostConfigRoot: controlConfig, athenaStateRoot: controlState });
+      await prepareArm({ caseDefinition, arm: "treatment", workspaceRoot: treatmentWorkspace, hostConfigRoot: treatmentConfig, athenaStateRoot: treatmentState, productionRuntime });
+      controlPreparations++;
+      treatmentPreparations++;
+      const [controlFingerprint, treatmentFingerprint] = await Promise.all([modelVisibleInputFingerprint(controlWorkspace), modelVisibleInputFingerprint(treatmentWorkspace)]);
+      if (controlFingerprint !== treatmentFingerprint) throw new BenchmarkInfrastructureError(`preflight workspace mismatch for ${pair.pairId}`);
+      await capturePathStates(controlWorkspace, caseDefinition.validator.forbiddenPaths ?? []);
+      await capturePathStates(treatmentWorkspace, caseDefinition.validator.forbiddenPaths ?? []);
+      const [controlHasConfig, treatmentConfigValue] = await Promise.all([
+        exists(join(controlState, ".athena", "config.json")),
+        readFile(join(treatmentState, ".athena", "config.json"), "utf8").then(JSON.parse),
+      ]);
+      if (controlHasConfig || treatmentConfigValue.mode !== "balanced" || treatmentConfigValue.provider !== "typesafe") throw new BenchmarkInfrastructureError(`preflight ATHENA arm isolation failed for ${pair.pairId}`);
+      if (caseDefinition.requestedNetworkPolicy === "offline") {
+        const sandbox = await createDockerSandbox();
+        try {
+          await prepareHostHomes(workRoot);
+        } finally {
+          await rm(sandbox.wrapperDir, { recursive: true, force: true });
+        }
+      }
+    } finally {
+      await rm(workRoot, { recursive: true, force: true });
+    }
+  }
+  return { cases: caseDefinitions.size, pairs: plan.pairs.length, treatmentPreparations, controlPreparations, gptCalls: 0, jevCalls: 0, resultArtifacts: 0 };
 }
 
 async function existingRuns(resultRoot) {

@@ -1,0 +1,25 @@
+{
+  "mode": "balanced",
+  "provider": "typesafe",
+  "reflexes": {
+    "risk": true,
+    "progress": true,
+    "stagnation": true,
+    "completion": true
+  },
+  "thresholds": {
+    "riskAsk": 0.8,
+    "riskDeny": 0.95,
+    "stagnation": 0.75,
+    "replan": 0.9,
+    "completionContinue": 0.85
+  },
+  "telemetry": {
+    "persist": true
+  },
+  "budgets": {
+    "maxJevCallsPerSession": 100,
+    "minMeaningfulActionsBetweenStagnationChecks": 2,
+    "replanCooldownMeaningfulActions": 3
+  }
+}

@@ -22,9 +22,15 @@ Benchmark execution uses five distinct filesystem roots:
 
 Control arm receives no `.opencode/plugins/` and no `.athena/` in either workspace or host config root.
 
+Phase 5B treatment config is frozen infrastructure at `bench/runners/phase5b-athena-config.json`. It duplicates existing balanced TypeSafe benchmark config, not task-fixture content. `prepareArm` writes it only to treatment state root. Missing or malformed canonical config stops setup with `BenchmarkInfrastructureError`.
+
 ## Harness Identity
 
 Each experiment fingerprints SHA-256 over sorted relative paths and contents of `.mjs` and `.json` files in `bench/runners`, `bench/validators`, `bench/schema`, and `bench/analysis`. These paths contain experiment planning, execution, host parsing, arm wiring, result validation, pair validation, and analysis. It excludes `bench/results`, Markdown, README files, documentation, temporary files, and captured run output. Manifest, every result, and pair validation record this fingerprint. Resume rejects missing or changed harness identity.
+
+## Phase 5B V1 aborted launch
+
+`phase5b-freeze-v1` launch attempt aborted before first scientific agent execution. Treatment `prepareArm` incorrectly read `.athena/config.json` from held-out fixture `lp-22`; held-out fixtures are task inputs and contain no benchmark-control config. Only `bench/results/phase5b-held-out/manifest.json` was created. No run result artifacts, GPT held-out calls, Jev held-out calls, or scientific observations were produced. This attempt is not a replicate.
 
 ## Arms and isolation
 

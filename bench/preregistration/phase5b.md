@@ -228,4 +228,4 @@ Report ONLY:
 
 ## Deviations From Protocol
 
-None before experiment start.
+`phase5b-freeze-v1` launch attempt aborted before first scientific agent execution because treatment `prepareArm` required `.athena/config.json` from held-out fixture `lp-22`. Only experiment manifest was created. No run result artifacts, GPT held-out calls, Jev held-out calls, or scientific observations were produced. This attempt is not a replicate. Phase 5B V2 moves exact existing balanced TypeSafe benchmark configuration into benchmark infrastructure and requires zero-model preflight of all planned pairs before collection.
