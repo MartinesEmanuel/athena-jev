@@ -22,17 +22,19 @@ export interface CompletionAssessment {
   unresolvedObligationsProbability: Probability;
 }
 
-export interface EpistemicsAssessment {
+export interface EpistemicAssessment {
   stateUncertainty: Probability;
   contextSufficiency: Probability;
   contradictionProbability: Probability;
 }
 
+export type EpistemicsAssessment = EpistemicAssessment;
+
 export interface CognitiveAssessment {
   safety: SafetyAssessment;
   progress: ProgressAssessment;
   completion: CompletionAssessment;
-  epistemics: EpistemicsAssessment;
+  epistemics: EpistemicAssessment;
 }
 
 function assertSafety(value: unknown): SafetyAssessment {
@@ -83,7 +85,7 @@ function assertCompletion(value: unknown): CompletionAssessment {
   };
 }
 
-function assertEpistemics(value: unknown): EpistemicsAssessment {
+function assertEpistemics(value: unknown): EpistemicAssessment {
   if (typeof value !== "object" || value === null)
     throw new TypeError("epistemics: expected object");
   const e = value as Record<string, unknown>;

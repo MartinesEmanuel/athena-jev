@@ -3,6 +3,20 @@ import { dirname, join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
 
+export {
+  type CognitiveAssessment,
+  type SafetyAssessment,
+  type ProgressAssessment,
+  type CompletionAssessment,
+  type EpistemicAssessment,
+  type CognitiveWorldState,
+  type ProbabilisticJudge,
+  type AegisJudgmentInput,
+  type MetisJudgmentInput,
+  type NikeJudgmentInput,
+  type EpistemicJudgmentInput,
+} from "./cognition/index.js";
+
 export type AthenaDecision = "allow" | "ask" | "deny" | "replan";
 export type AthenaMode = "shadow" | "guardian" | "balanced";
 export type ReflexKind = "risk" | "progress" | "stagnation" | "completion";

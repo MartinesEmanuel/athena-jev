@@ -15,10 +15,10 @@ export function isValidCandidateAction(
 ): value is CandidateAction {
   if (typeof value !== "object" || value === null) return false;
   const obj = value as Record<string, unknown>;
-  if (typeof obj.id !== "string") return false;
+  if (typeof obj.id !== "string" || obj.id.trim().length === 0) return false;
   if (!["tool", "answer", "complete"].includes(obj.kind as string))
     return false;
-  if (typeof obj.intent !== "string") return false;
+  if (typeof obj.intent !== "string" || obj.intent.trim().length === 0) return false;
   if (obj.tool !== undefined && typeof obj.tool !== "string") return false;
   if (obj.input !== undefined && typeof obj.input !== "string") return false;
   if (
