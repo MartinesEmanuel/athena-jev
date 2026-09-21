@@ -202,6 +202,8 @@ describe("CognitiveAssessmentEngine", () => {
     expect(Object.isFrozen((seen[0] as AegisJudgmentInput).candidate)).toBe(true);
     expect(Object.isFrozen((seen[1] as MetisJudgmentInput).goal)).toBe(true);
     expect((seen[0] as AegisJudgmentInput).candidate).toBe((seen[1] as MetisJudgmentInput).candidate);
+    expect((seen[0] as AegisJudgmentInput).currentObservation).toEqual(mutable.currentObservation);
+    expect((seen[2] as NikeJudgmentInput).recentActions).toEqual(mutable.recentActions);
     expect((seen[3] as EpistemicJudgmentInput).recentStrategies).toEqual(mutable.recentStrategies);
   });
 

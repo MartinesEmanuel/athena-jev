@@ -28,9 +28,9 @@ export class InvalidObserverAssessmentError extends Error {
   }
 }
 
-export interface AegisJudgmentInput { readonly candidate: CognitiveWorldState["candidate"]; readonly environment: CognitiveWorldState["environment"]; readonly recentFailures: readonly CognitiveWorldState["recentActions"][number][]; }
+export interface AegisJudgmentInput { readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly environment: CognitiveWorldState["environment"]; readonly recentFailures: readonly CognitiveWorldState["recentActions"][number][]; }
 export interface MetisJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly recentActions: CognitiveWorldState["recentActions"]; readonly recentStrategies: CognitiveWorldState["recentStrategies"]; }
-export interface NikeJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly obligations: CognitiveWorldState["unresolvedObligations"]; }
+export interface NikeJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly recentActions: CognitiveWorldState["recentActions"]; readonly obligations: CognitiveWorldState["unresolvedObligations"]; }
 export interface EpistemicJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly recentActions: CognitiveWorldState["recentActions"]; readonly recentStrategies: CognitiveWorldState["recentStrategies"]; readonly obligations: CognitiveWorldState["unresolvedObligations"]; }
 
 function frozen<T extends object>(value: T): T { return Object.freeze(value); }
@@ -53,7 +53,7 @@ abstract class JudgeObserver<Input, Assessment> implements CognitiveObserver<Ass
 export class AegisObserver extends JudgeObserver<AegisJudgmentInput, SafetyAssessment> {
   readonly name = "AEGIS";
   readonly version = AEGIS_OBSERVER_VERSION;
-  protected input(world: CognitiveWorldState): AegisJudgmentInput { return frozen({ candidate: world.candidate, environment: world.environment, recentFailures: Object.freeze(world.recentActions.filter((action) => action.outcome === "FAILURE")) }); }
+  protected input(world: CognitiveWorldState): AegisJudgmentInput { return frozen({ candidate: world.candidate, currentObservation: world.currentObservation, environment: world.environment, recentFailures: Object.freeze(world.recentActions.filter((action) => action.outcome === "FAILURE")) }); }
   protected validate(value: unknown): SafetyAssessment { return assertCognitiveAssessment({ safety: value, progress: zeros.progress, completion: zeros.completion, epistemics: zeros.epistemics }).safety; }
 }
 
@@ -67,7 +67,7 @@ export class MetisObserver extends JudgeObserver<MetisJudgmentInput, ProgressAss
 export class NikeObserver extends JudgeObserver<NikeJudgmentInput, CompletionAssessment> {
   readonly name = "NIKE";
   readonly version = NIKE_OBSERVER_VERSION;
-  protected input(world: CognitiveWorldState): NikeJudgmentInput { return frozen({ goal: world.goal, candidate: world.candidate, currentObservation: world.currentObservation, obligations: world.unresolvedObligations }); }
+  protected input(world: CognitiveWorldState): NikeJudgmentInput { return frozen({ goal: world.goal, candidate: world.candidate, currentObservation: world.currentObservation, recentActions: world.recentActions, obligations: world.unresolvedObligations }); }
   protected validate(value: unknown): CompletionAssessment { return assertCognitiveAssessment({ safety: zeros.safety, progress: zeros.progress, completion: value, epistemics: zeros.epistemics }).completion; }
 }
 

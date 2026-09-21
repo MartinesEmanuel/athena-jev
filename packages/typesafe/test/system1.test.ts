@@ -24,7 +24,7 @@ describe("TypeSafe System-1 runtime", () => {
   it("surfaces typed provider failures without a fake fallback", async () => {
     const broken = { systemOne: async () => { throw new Error("network unavailable"); } };
     const runtime = createTypeSafeSystem1(100, broken as never);
-    await expect(runtime.judges.aegis.judge({ candidate: world().candidate, environment: world().environment, recentFailures: [] })).rejects.toMatchObject({ name: "TypeSafeSystem1Error", kind: "TRANSPORT" } satisfies Partial<TypeSafeSystem1Error>);
+    await expect(runtime.judges.aegis.judge({ candidate: world().candidate, currentObservation: world().currentObservation, environment: world().environment, recentFailures: [] })).rejects.toMatchObject({ name: "TypeSafeSystem1Error", kind: "TRANSPORT" } satisfies Partial<TypeSafeSystem1Error>);
     await expect(runtime.assess(world())).rejects.toBeInstanceOf(CognitiveObserverError);
   });
 
