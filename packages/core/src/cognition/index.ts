@@ -94,6 +94,30 @@ export {
 } from "./policy.js";
 
 export {
+  MAX_DELIBERATION_EVIDENCE,
+  MAX_DELIBERATION_ACTIONS,
+  MAX_DELIBERATION_TEXT_LENGTH,
+  MAX_RENDERED_DELIBERATION_CONTEXT_LENGTH,
+  type CognitiveFailureMode,
+  type RevisedStrategy,
+  type DeliberationRequest,
+  type PrivilegedCognitiveContext,
+  type System2DeliberationResult,
+  type System2Bridge,
+  type StrategyShiftAssessment,
+  type DeliberationOrchestrationResult,
+  System2DeliberationError,
+  InvalidSystem2ResultError,
+  StaleDeliberationResultError,
+  assertRevisedStrategy,
+  assertSystem2DeliberationResult,
+  buildDeliberationRequest,
+  renderDeliberationContext,
+  assessStrategyShift,
+  System2DeliberationOrchestrator,
+} from "./deliberation.js";
+
+export {
   type CognitivePhase,
   COGNITIVE_PHASES,
   isValidCognitivePhase,
