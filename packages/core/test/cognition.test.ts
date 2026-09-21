@@ -11,6 +11,14 @@ import {
   isValidDecision,
   isValidReasonCode,
   initialCognitiveState,
+  isValidCognitivePhase,
+  COGNITIVE_PHASES,
+  transitionCognitiveState,
+  replayCognitiveEvents,
+  assertCognitiveStateInvariant,
+  CognitiveTransitionError,
+  CognitiveStateInvariantError,
+  MAX_RECENT_COGNITIVE_ASSESSMENTS,
   COGNITIVE_ASSESSMENT_SCHEMA_VERSION,
   COGNITIVE_POLICY_VERSION,
 } from "../src/cognition/index.js";
@@ -165,7 +173,8 @@ describe("CognitiveAssessment", () => {
   });
 
   it("rejects missing domain", () => {
-    const { safety, ...rest } = validAssessment;
+    const rest = { ...validAssessment };
+    Reflect.deleteProperty(rest, "safety");
     expect(isValidCognitiveAssessment(rest)).toBe(false);
   });
 
@@ -241,6 +250,21 @@ describe("ReasonCode", () => {
   });
 });
 
+// ── CognitivePhase ────────────────────────────────────────────────────
+
+describe("CognitivePhase", () => {
+  it("contains exactly 7 phases", () => {
+    expect(COGNITIVE_PHASES).toHaveLength(7);
+  });
+
+  it("validates phases", () => {
+    expect(isValidCognitivePhase("READY")).toBe(true);
+    expect(isValidCognitivePhase("DEGRADED")).toBe(true);
+    expect(isValidCognitivePhase("BLOCKED")).toBe(false);
+    expect(isValidCognitivePhase("")).toBe(false);
+  });
+});
+
 // ── CognitiveState ───────────────────────────────────────────────────
 
 describe("CognitiveState", () => {
@@ -252,8 +276,13 @@ describe("CognitiveState", () => {
 
   it("initial state values", () => {
     const s = initialCognitiveState();
+    expect(s.phase).toBe("READY");
+    expect(s.activeCandidateId).toBeNull();
+    expect(s.pendingDeliberationCandidateId).toBeNull();
+    expect(s.pendingVerificationCandidateId).toBeNull();
+    expect(s.lastAssessment).toBeNull();
+    expect(s.lastDecision).toBeNull();
     expect(s.step).toBe(0);
-    expect(s.lastDecision).toBeUndefined();
     expect(s.consecutiveLowProgress).toBe(0);
     expect(s.consecutiveLowInformationGain).toBe(0);
     expect(s.consecutiveHighStagnation).toBe(0);
@@ -263,6 +292,10 @@ describe("CognitiveState", () => {
     expect(s.blocks).toBe(0);
     expect(s.awaitingStrategyShift).toBe(false);
     expect(s.recentAssessments).toEqual([]);
+    expect(s.degradedReason).toBeNull();
+    expect(s.hasCompletedAssessment).toBe(false);
+    expect(s.assessmentInProgress).toBe(false);
+    expect(s.executionAuthorized).toBe(false);
   });
 });
 
@@ -281,11 +314,12 @@ describe("CognitiveEvent", () => {
     "VERIFICATION_COMPLETED",
     "ACTION_ALLOWED",
     "ACTION_BLOCKED",
+    "TOOL_COMPLETED",
     "COGNITIVE_RUNTIME_DEGRADED",
   ];
 
-  it("has exactly 12 event types", () => {
-    expect(eventTypes).toHaveLength(12);
+  it("has exactly 13 event types", () => {
+    expect(eventTypes).toHaveLength(13);
   });
 
   it("events are discriminated by type field", () => {
@@ -322,7 +356,6 @@ describe("Version constants", () => {
 
 describe("Public cognition exports", () => {
   it("all exports are accessible", () => {
-    // Verify all named exports exist and are defined
     expect(typeof isProbability).toBe("function");
     expect(typeof assertProbability).toBe("function");
     expect(typeof isValidCandidateAction).toBe("function");
@@ -331,9 +364,17 @@ describe("Public cognition exports", () => {
     expect(typeof isValidCognitiveAssessment).toBe("function");
     expect(typeof isValidDecision).toBe("function");
     expect(typeof isValidReasonCode).toBe("function");
+    expect(typeof isValidCognitivePhase).toBe("function");
     expect(typeof initialCognitiveState).toBe("function");
+    expect(typeof transitionCognitiveState).toBe("function");
+    expect(typeof replayCognitiveEvents).toBe("function");
+    expect(typeof assertCognitiveStateInvariant).toBe("function");
+    expect(typeof CognitiveTransitionError).toBe("function");
+    expect(typeof CognitiveStateInvariantError).toBe("function");
+    expect(typeof MAX_RECENT_COGNITIVE_ASSESSMENTS).toBe("number");
     expect(DECISIONS).toBeDefined();
     expect(REASON_CODES).toBeDefined();
+    expect(COGNITIVE_PHASES).toBeDefined();
     expect(COGNITIVE_ASSESSMENT_SCHEMA_VERSION).toBeDefined();
     expect(COGNITIVE_POLICY_VERSION).toBeDefined();
   });

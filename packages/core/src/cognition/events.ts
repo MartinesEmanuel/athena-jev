@@ -13,6 +13,7 @@ export type CognitiveEventType =
   | "VERIFICATION_COMPLETED"
   | "ACTION_ALLOWED"
   | "ACTION_BLOCKED"
+  | "TOOL_COMPLETED"
   | "COGNITIVE_RUNTIME_DEGRADED";
 
 export interface CognitiveEventBase {
@@ -41,6 +42,7 @@ export interface AssessmentCompletedEvent extends CognitiveEventBase {
 
 export interface CognitiveDecisionEvent extends CognitiveEventBase {
   readonly type: "COGNITIVE_DECISION";
+  readonly candidateId: string;
   readonly gateResult: CognitiveGateResult;
 }
 
@@ -58,6 +60,7 @@ export interface DeliberationAppliedEvent extends CognitiveEventBase {
 
 export interface StrategyShiftObservedEvent extends CognitiveEventBase {
   readonly type: "STRATEGY_SHIFT_OBSERVED";
+  readonly candidateId: string;
   readonly from: string;
   readonly to: string;
 }
@@ -84,6 +87,11 @@ export interface ActionBlockedEvent extends CognitiveEventBase {
   readonly reasons: readonly string[];
 }
 
+export interface ToolCompletedEvent extends CognitiveEventBase {
+  readonly type: "TOOL_COMPLETED";
+  readonly candidateId: string;
+}
+
 export interface CognitiveRuntimeDegradedEvent extends CognitiveEventBase {
   readonly type: "COGNITIVE_RUNTIME_DEGRADED";
   readonly error: string;
@@ -101,6 +109,6 @@ export type CognitiveEvent =
   | VerificationCompletedEvent
   | ActionAllowedEvent
   | ActionBlockedEvent
+  | ToolCompletedEvent
   | CognitiveRuntimeDegradedEvent;
-
 

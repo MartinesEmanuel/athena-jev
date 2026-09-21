@@ -32,8 +32,15 @@ export {
 } from "./decision.js";
 
 export {
+  type CognitivePhase,
+  COGNITIVE_PHASES,
+  isValidCognitivePhase,
   type CognitiveState,
   initialCognitiveState,
+  assertCognitiveStateInvariant,
+  CognitiveTransitionError,
+  CognitiveStateInvariantError,
+  MAX_RECENT_COGNITIVE_ASSESSMENTS,
 } from "./state.js";
 
 export {
@@ -50,8 +57,16 @@ export {
   type VerificationCompletedEvent,
   type ActionAllowedEvent,
   type ActionBlockedEvent,
+  type ToolCompletedEvent,
   type CognitiveRuntimeDegradedEvent,
 } from "./events.js";
+
+export {
+  transitionCognitiveState,
+  replayCognitiveEvents,
+  applyCognitiveEvent,
+  type CognitiveTransitionResult,
+} from "./transition.js";
 
 export const COGNITIVE_ASSESSMENT_SCHEMA_VERSION = "1" as const;
 export const COGNITIVE_POLICY_VERSION = "0.2.0" as const;
