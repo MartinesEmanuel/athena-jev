@@ -25,6 +25,12 @@ export {
   CognitivePolicy,
   buildCognitiveWorldState,
   initialCognitiveState,
+  type CognitiveState,
+  System2DeliberationOrchestrator,
+  policyResultToEvidenceEvent,
+  policyResultToDecisionEvent,
+  transitionCognitiveState,
+  type System2Bridge,
 } from "./cognition/index.js";
 
 export type AthenaDecision = "allow" | "ask" | "deny" | "replan";

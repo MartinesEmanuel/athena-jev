@@ -31,7 +31,7 @@ export class InvalidObserverAssessmentError extends Error {
 export interface AegisJudgmentInput { readonly candidate: CognitiveWorldState["candidate"]; readonly environment: CognitiveWorldState["environment"]; readonly recentFailures: readonly CognitiveWorldState["recentActions"][number][]; }
 export interface MetisJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly recentActions: CognitiveWorldState["recentActions"]; readonly recentStrategies: CognitiveWorldState["recentStrategies"]; }
 export interface NikeJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly obligations: CognitiveWorldState["unresolvedObligations"]; }
-export interface EpistemicJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly recentActions: CognitiveWorldState["recentActions"]; readonly obligations: CognitiveWorldState["unresolvedObligations"]; }
+export interface EpistemicJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly recentActions: CognitiveWorldState["recentActions"]; readonly recentStrategies: CognitiveWorldState["recentStrategies"]; readonly obligations: CognitiveWorldState["unresolvedObligations"]; }
 
 function frozen<T extends object>(value: T): T { return Object.freeze(value); }
 
@@ -74,7 +74,7 @@ export class NikeObserver extends JudgeObserver<NikeJudgmentInput, CompletionAss
 export class EpistemicObserver extends JudgeObserver<EpistemicJudgmentInput, EpistemicsAssessment> {
   readonly name = "EPISTEMICS";
   readonly version = EPISTEMIC_OBSERVER_VERSION;
-  protected input(world: CognitiveWorldState): EpistemicJudgmentInput { return frozen({ goal: world.goal, candidate: world.candidate, currentObservation: world.currentObservation, recentActions: world.recentActions, obligations: world.unresolvedObligations }); }
+  protected input(world: CognitiveWorldState): EpistemicJudgmentInput { return frozen({ goal: world.goal, candidate: world.candidate, currentObservation: world.currentObservation, recentActions: world.recentActions, recentStrategies: world.recentStrategies, obligations: world.unresolvedObligations }); }
   protected validate(value: unknown): EpistemicsAssessment { return assertCognitiveAssessment({ safety: zeros.safety, progress: zeros.progress, completion: zeros.completion, epistemics: value }).epistemics; }
 }
 

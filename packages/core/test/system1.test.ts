@@ -202,6 +202,7 @@ describe("CognitiveAssessmentEngine", () => {
     expect(Object.isFrozen((seen[0] as AegisJudgmentInput).candidate)).toBe(true);
     expect(Object.isFrozen((seen[1] as MetisJudgmentInput).goal)).toBe(true);
     expect((seen[0] as AegisJudgmentInput).candidate).toBe((seen[1] as MetisJudgmentInput).candidate);
+    expect((seen[3] as EpistemicJudgmentInput).recentStrategies).toEqual(mutable.recentStrategies);
   });
 
   it("builds pure offline snapshots with validated round trips", async () => {
