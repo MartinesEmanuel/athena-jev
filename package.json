@@ -14,6 +14,7 @@
     "cognitive:live": "pnpm --filter @athena/typesafe build && node packages/typesafe/dist/live-system1.js",
     "cognitive:system2:live": "pnpm --filter @athena/typesafe build && node packages/typesafe/dist/live-system2.js",
     "cognitive:dual:live": "pnpm --filter @athena/typesafe build && node packages/typesafe/dist/live-dual.js",
+    "athena:opencode": "opencode .",
     "eval": "node evals/run.mjs",
     "eval:report": "node evals/report.mjs",
     "metis:calibrate": "node evals/metis-calibration/run.mjs",

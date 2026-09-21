@@ -12,6 +12,15 @@ export const MAX_COGNITIVE_TEXT_LENGTH = 1000;
 
 export type ObservationOutcome = "SUCCESS" | "FAILURE" | "UNKNOWN";
 export type ObligationStatus = "OPEN" | "SATISFIED" | "UNKNOWN";
+export type EvidenceSource = "USER" | "TOOL" | "SYSTEM2" | "ATHENA" | "DETERMINISTIC";
+export type EpistemicStatus = "OBSERVED" | "PROPOSED" | "INFERRED";
+export type EvidenceTrust = "TRUSTED" | "UNTRUSTED";
+
+export interface EvidenceProvenance {
+  readonly source: EvidenceSource;
+  readonly epistemicStatus: EpistemicStatus;
+  readonly trust: EvidenceTrust;
+}
 
 export interface GoalState {
   readonly goalId: string;
@@ -25,6 +34,7 @@ export interface CurrentObservation {
   readonly summary: string;
   readonly outcome: ObservationOutcome;
   readonly errorSummary?: string;
+  readonly provenance: EvidenceProvenance;
 }
 
 export interface ActionObservation {
@@ -35,6 +45,7 @@ export interface ActionObservation {
   readonly outcome: ObservationOutcome;
   readonly informationSummary?: string;
   readonly errorSummary?: string;
+  readonly provenance: EvidenceProvenance;
 }
 
 export interface StrategyFrame {
@@ -43,7 +54,13 @@ export interface StrategyFrame {
   readonly approach: string;
   readonly hypothesisId?: string;
   readonly target?: string;
+  // Optional type preserves callers that construct strategy frames outside world-state input.
+  readonly provenance?: EvidenceProvenance;
 }
+
+export type CurrentObservationInput = Omit<CurrentObservation, "provenance"> & { readonly provenance?: EvidenceProvenance };
+export type ActionObservationInput = Omit<ActionObservation, "provenance"> & { readonly provenance?: EvidenceProvenance };
+export type StrategyFrameInput = Omit<StrategyFrame, "provenance"> & { readonly provenance?: EvidenceProvenance };
 
 export interface Obligation {
   readonly id: string;
@@ -70,9 +87,9 @@ export interface CognitiveWorldState {
 export interface CognitiveWorldStateInput {
   readonly goal: GoalState;
   readonly candidate: CandidateAction;
-  readonly currentObservation?: CurrentObservation | null;
-  readonly recentActions?: readonly ActionObservation[];
-  readonly recentStrategies?: readonly StrategyFrame[];
+  readonly currentObservation?: CurrentObservationInput | null;
+  readonly recentActions?: readonly ActionObservationInput[];
+  readonly recentStrategies?: readonly StrategyFrameInput[];
   readonly unresolvedObligations?: readonly Obligation[];
   readonly environment?: Partial<CognitiveEnvironmentState>;
 }
@@ -114,6 +131,19 @@ function outcome(value: unknown, label: string): ObservationOutcome {
   throw new TypeError(`${label}: expected SUCCESS, FAILURE, or UNKNOWN`);
 }
 
+function provenance(value: unknown, label: string, defaults: EvidenceProvenance): EvidenceProvenance {
+  if (value === undefined) return Object.freeze({ ...defaults });
+  const item = exact(value, label, ["source", "epistemicStatus", "trust"]);
+  if (item.source !== "USER" && item.source !== "TOOL" && item.source !== "SYSTEM2" && item.source !== "ATHENA" && item.source !== "DETERMINISTIC") {
+    throw new TypeError(`${label}.source: invalid evidence source`);
+  }
+  if (item.epistemicStatus !== "OBSERVED" && item.epistemicStatus !== "PROPOSED" && item.epistemicStatus !== "INFERRED") {
+    throw new TypeError(`${label}.epistemicStatus: invalid epistemic status`);
+  }
+  if (item.trust !== "TRUSTED" && item.trust !== "UNTRUSTED") throw new TypeError(`${label}.trust: invalid evidence trust`);
+  return Object.freeze({ source: item.source, epistemicStatus: item.epistemicStatus, trust: item.trust });
+}
+
 function cloneCandidate(value: unknown): CandidateAction {
   const candidate = assertCandidateAction(value);
   text(candidate.id, "candidate.id");
@@ -133,26 +163,26 @@ function goal(value: unknown): GoalState {
 }
 
 function observation(value: unknown): CurrentObservation {
-  const item = exact(value, "currentObservation", ["source", "summary", "outcome", "errorSummary"]);
+  const item = exact(value, "currentObservation", ["source", "summary", "outcome", "errorSummary", "provenance"]);
   const errorSummary = text(optional(item, "errorSummary"), "currentObservation.errorSummary", true);
-  return Object.freeze({ source: text(item.source, "currentObservation.source")!, summary: text(item.summary, "currentObservation.summary")!, outcome: outcome(item.outcome, "currentObservation.outcome"), ...(errorSummary === undefined ? {} : { errorSummary }) });
+  return Object.freeze({ source: text(item.source, "currentObservation.source")!, summary: text(item.summary, "currentObservation.summary")!, outcome: outcome(item.outcome, "currentObservation.outcome"), ...(errorSummary === undefined ? {} : { errorSummary }), provenance: provenance(optional(item, "provenance"), "currentObservation.provenance", { source: "TOOL", epistemicStatus: "OBSERVED", trust: "UNTRUSTED" }) });
 }
 
 function action(value: unknown): ActionObservation {
-  const item = exact(value, "recentAction", ["candidateId", "kind", "intent", "tool", "outcome", "informationSummary", "errorSummary"]);
+  const item = exact(value, "recentAction", ["candidateId", "kind", "intent", "tool", "outcome", "informationSummary", "errorSummary", "provenance"]);
   const kind = item.kind;
   if (kind !== "tool" && kind !== "answer" && kind !== "complete") throw new TypeError("recentAction.kind: invalid candidate kind");
   const tool = text(optional(item, "tool"), "recentAction.tool", true);
   const informationSummary = text(optional(item, "informationSummary"), "recentAction.informationSummary", true);
   const errorSummary = text(optional(item, "errorSummary"), "recentAction.errorSummary", true);
-  return Object.freeze({ candidateId: text(item.candidateId, "recentAction.candidateId")!, kind, intent: text(item.intent, "recentAction.intent")!, outcome: outcome(item.outcome, "recentAction.outcome"), ...(tool === undefined ? {} : { tool }), ...(informationSummary === undefined ? {} : { informationSummary }), ...(errorSummary === undefined ? {} : { errorSummary }) });
+  return Object.freeze({ candidateId: text(item.candidateId, "recentAction.candidateId")!, kind, intent: text(item.intent, "recentAction.intent")!, outcome: outcome(item.outcome, "recentAction.outcome"), ...(tool === undefined ? {} : { tool }), ...(informationSummary === undefined ? {} : { informationSummary }), ...(errorSummary === undefined ? {} : { errorSummary }), provenance: provenance(optional(item, "provenance"), "recentAction.provenance", { source: "TOOL", epistemicStatus: "OBSERVED", trust: "UNTRUSTED" }) });
 }
 
 function strategy(value: unknown): StrategyFrame {
-  const item = exact(value, "recentStrategy", ["strategyId", "intent", "approach", "hypothesisId", "target"]);
+  const item = exact(value, "recentStrategy", ["strategyId", "intent", "approach", "hypothesisId", "target", "provenance"]);
   const hypothesisId = text(optional(item, "hypothesisId"), "recentStrategy.hypothesisId", true);
   const target = text(optional(item, "target"), "recentStrategy.target", true);
-  return Object.freeze({ strategyId: text(item.strategyId, "recentStrategy.strategyId")!, intent: text(item.intent, "recentStrategy.intent")!, approach: text(item.approach, "recentStrategy.approach")!, ...(hypothesisId === undefined ? {} : { hypothesisId }), ...(target === undefined ? {} : { target }) });
+  return Object.freeze({ strategyId: text(item.strategyId, "recentStrategy.strategyId")!, intent: text(item.intent, "recentStrategy.intent")!, approach: text(item.approach, "recentStrategy.approach")!, ...(hypothesisId === undefined ? {} : { hypothesisId }), ...(target === undefined ? {} : { target }), provenance: provenance(optional(item, "provenance"), "recentStrategy.provenance", { source: "ATHENA", epistemicStatus: "PROPOSED", trust: "UNTRUSTED" }) });
 }
 
 function obligation(value: unknown): Obligation {

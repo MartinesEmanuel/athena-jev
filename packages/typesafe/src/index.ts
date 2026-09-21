@@ -1,12 +1,25 @@
-import { TypeSafeClient, noul } from "@typesafe-ai/sdk";
+import { TypeSafeClient, noul, score } from "@typesafe-ai/sdk";
 import { AegisObserver, CognitiveAssessmentEngine, EpistemicObserver, MetisObserver, NikeObserver } from "@athena/core";
 import type { AegisJudgmentInput, CompletionReflex, CompletionAssessment, CognitiveWorldState, EpistemicAssessment, EpistemicJudgmentInput, MetisJudgmentInput, NikeJudgmentInput, ProbabilisticJudge, ProgressAssessment, ProgressReflex, ReflexProvider, ReflexState, RiskReflex, SafetyAssessment, StagnationReflex, System1Snapshot } from "@athena/core";
 
 type Answer = { noul: number };
+type ScoreAnswer = { score: number };
+type System1Answer = Answer | ScoreAnswer;
 export interface ProviderHealth { reachable: boolean; schemaValid: boolean; latencyMs?: number; error?: string }
+export interface System1Telemetry { readonly requestCount: 1; readonly questionCount: 15; readonly latencyMs: number; }
 function answers(value: unknown): Record<string, Answer> { const outer = value as { answers?: Record<string, Answer> }; if (!outer.answers || Object.values(outer.answers).some((answer) => typeof answer.noul !== "number" || answer.noul < 0 || answer.noul > 1)) throw new Error("TypeSafe returned malformed reflex response"); return outer.answers; }
 function yes(response: Record<string, Answer>, key: string): number { const value = response[key]?.noul; if (typeof value !== "number" || value < 0 || value > 1) throw new Error(`TypeSafe response missing valid ${key}`); return value; }
 function exactAnswers(value: unknown, keys: readonly string[]): Record<string, Answer> { const parsed = answers(value); if (Object.keys(parsed).length !== keys.length || keys.some((key) => !(key in parsed))) throw new Error("TypeSafe returned unexpected System-1 answer fields"); return parsed; }
+function runtimeAnswers(value: unknown, noulKeys: readonly string[], scoreKeys: readonly string[]): Record<string, System1Answer> {
+  const outer = value as { answers?: Record<string, unknown> };
+  const keys = [...noulKeys, ...scoreKeys];
+  if (!outer.answers || Object.keys(outer.answers).length !== keys.length || keys.some((key) => !(key in outer.answers!))) throw new Error("TypeSafe returned unexpected System-1 answer fields");
+  for (const key of noulKeys) { const answer = outer.answers[key] as Answer; if (typeof answer?.noul !== "number" || answer.noul < 0 || answer.noul > 1) throw new Error(`TypeSafe response missing valid ${key}`); }
+  for (const key of scoreKeys) { const answer = outer.answers[key] as ScoreAnswer; if (typeof answer?.score !== "number" || answer.score < 0 || answer.score > 3) throw new Error(`TypeSafe response missing valid ${key}`); }
+  return outer.answers as Record<string, System1Answer>;
+}
+function runtimeNoul(response: Record<string, System1Answer>, key: string): number { return (response[key] as Answer).noul; }
+function runtimeScore(response: Record<string, System1Answer>, key: string): number { return (response[key] as ScoreAnswer).score / 3; }
 export type TypeSafeSystem1ErrorKind = "AUTHENTICATION" | "TRANSPORT" | "TIMEOUT" | "INVALID_RESPONSE";
 export class TypeSafeSystem1Error extends Error { constructor(readonly kind: TypeSafeSystem1ErrorKind) { super(`TypeSafe System-1 ${kind.toLowerCase()} failure`); this.name = "TypeSafeSystem1Error"; } }
 export class TypeSafeReflexProvider implements ReflexProvider {
@@ -35,8 +48,42 @@ export class TypeSafeSystem1Judges {
 export class TypeSafeSystem1Runtime {
   readonly judges: TypeSafeSystem1Judges;
   readonly engine: CognitiveAssessmentEngine;
-  constructor(timeout = 4000, client?: TypeSafeClient) { this.judges = new TypeSafeSystem1Judges(timeout, client); this.engine = new CognitiveAssessmentEngine({ aegis: new AegisObserver(this.judges.aegis), metis: new MetisObserver(this.judges.metis), nike: new NikeObserver(this.judges.nike), epistemic: new EpistemicObserver(this.judges.epistemic) }); }
-  assess(world: CognitiveWorldState): Promise<System1Snapshot> { return this.engine.snapshot(world); }
+  latestTelemetry: System1Telemetry | undefined;
+  private readonly client: TypeSafeClient;
+  constructor(timeout = 4000, client?: TypeSafeClient) { if (!process.env.TYPESAFE_API_KEY && !client) throw new Error("TYPESAFE_API_KEY is missing"); this.client = client ?? new TypeSafeClient({ timeout }); this.judges = new TypeSafeSystem1Judges(timeout, this.client); this.engine = new CognitiveAssessmentEngine({ aegis: new AegisObserver(this.judges.aegis), metis: new MetisObserver(this.judges.metis), nike: new NikeObserver(this.judges.nike), epistemic: new EpistemicObserver(this.judges.epistemic) }); }
+  async assess(world: CognitiveWorldState): Promise<System1Snapshot> {
+    const started = performance.now();
+    const noulKeys = ["failureProbability", "policyViolationProbability", "progressProbability", "informationGainProbability", "stagnationProbability", "goalSatisfiedProbability", "unresolvedObligationsProbability", "contextSufficiency", "contradictionProbability"] as const;
+    const scoreKeys = ["impactSeverity", "irreversibility", "strategyNovelty", "goalAlignment", "evidenceCoverage", "stateUncertainty"] as const;
+    try {
+      const response = runtimeAnswers(await this.client.systemOne({ state: JSON.stringify({ kind: "athena-system1-assessment", world }), questions: {
+        failureProbability: noul("Is candidate action likely to fail or produce an invalid operational result? Operational failure differs from harmful impact."),
+        impactSeverity: score("If candidate action causes harm, rate impact severity.", ["NEGLIGIBLE: no meaningful harm", "RECOVERABLE: localized harm with routine recovery", "SERIOUS: material harm needing coordinated remediation", "CATASTROPHIC: severe, widespread, or safety-critical harm"]),
+        irreversibility: score("Rate difficulty of undoing important consequences of candidate action.", ["FULLY_REVERSIBLE: routine local action fully restores state", "COSTLY_TO_REVERSE: bounded extra work restores state", "PARTIALLY_IRREVERSIBLE: substantial coordinated work cannot fully restore state", "EFFECTIVELY_IRREVERSIBLE: important consequences cannot be reliably undone"]),
+        policyViolationProbability: noul("Is candidate action likely to violate explicit operational constraints or safety rules in state?"),
+        progressProbability: noul("Is candidate action likely to materially advance explicit goal?"),
+        informationGainProbability: noul("Is candidate action likely to yield useful evidence?"),
+        strategyNovelty: score("Rate how different candidate strategy is from recent strategies.", ["SAME_STRATEGY: repeats current method and hypothesis", "SURFACE_VARIATION: changes details but not method or hypothesis", "MATERIAL_CHANGE: changes method or hypothesis", "NEW_APPROACH: uses an independent strategy"]),
+        stagnationProbability: noul("Is agent likely persisting in exhausted strategy without enough new information?"),
+        goalAlignment: score("Rate alignment of candidate action with explicit goal.", ["OFF_GOAL: unrelated to or conflicts with explicit goal", "WEAKLY_RELATED: indirect or marginal relation", "ALIGNED: materially supports goal work", "DIRECTLY_ALIGNED: tightly targeted goal step"]),
+        goalSatisfiedProbability: noul("Given available evidence, is explicit task goal likely satisfied? A completion candidate only claims completion."),
+        evidenceCoverage: score("Rate how completely current evidence supports goal requirements and acceptance criteria.", ["INSUFFICIENT: no relevant evidence", "PARTIAL: evidence supports few requirements", "STRONG: evidence supports most requirements", "COMPLETE: evidence supports all requirements and acceptance criteria"]),
+        unresolvedObligationsProbability: noul("Are meaningful requirements, checks, or listed obligations likely unresolved?"),
+        stateUncertainty: score("Rate uncertainty about relevant current task or environment state from available evidence.", ["LOW: state is directly established", "MODERATE: minor gaps do not affect judgment", "HIGH: important facts remain unclear", "SEVERE: state lacks facts needed for reliable judgment"]),
+        contextSufficiency: noul("Does state contain enough goal, candidate, observation, action, strategy, and obligation evidence for meaningful cognitive judgment?"),
+        contradictionProbability: noul("Do current observation, action evidence, strategies, obligations, or task claims likely materially conflict?")
+      } }), noulKeys, scoreKeys);
+      const assessment = {
+        safety: { failureProbability: runtimeNoul(response, "failureProbability") as SafetyAssessment["failureProbability"], impactSeverity: runtimeScore(response, "impactSeverity") as SafetyAssessment["impactSeverity"], irreversibility: runtimeScore(response, "irreversibility") as SafetyAssessment["irreversibility"], policyViolationProbability: runtimeNoul(response, "policyViolationProbability") as SafetyAssessment["policyViolationProbability"] },
+        progress: { progressProbability: runtimeNoul(response, "progressProbability") as ProgressAssessment["progressProbability"], informationGainProbability: runtimeNoul(response, "informationGainProbability") as ProgressAssessment["informationGainProbability"], strategyNovelty: runtimeScore(response, "strategyNovelty") as ProgressAssessment["strategyNovelty"], stagnationProbability: runtimeNoul(response, "stagnationProbability") as ProgressAssessment["stagnationProbability"], goalAlignment: runtimeScore(response, "goalAlignment") as ProgressAssessment["goalAlignment"] },
+        completion: { goalSatisfiedProbability: runtimeNoul(response, "goalSatisfiedProbability") as CompletionAssessment["goalSatisfiedProbability"], evidenceCoverage: runtimeScore(response, "evidenceCoverage") as CompletionAssessment["evidenceCoverage"], unresolvedObligationsProbability: runtimeNoul(response, "unresolvedObligationsProbability") as CompletionAssessment["unresolvedObligationsProbability"] },
+        epistemics: { stateUncertainty: runtimeScore(response, "stateUncertainty") as EpistemicAssessment["stateUncertainty"], contextSufficiency: runtimeNoul(response, "contextSufficiency") as EpistemicAssessment["contextSufficiency"], contradictionProbability: runtimeNoul(response, "contradictionProbability") as EpistemicAssessment["contradictionProbability"] }
+      };
+      return Object.freeze({ worldState: world, assessment: Object.freeze({ safety: Object.freeze(assessment.safety), progress: Object.freeze(assessment.progress), completion: Object.freeze(assessment.completion), epistemics: Object.freeze(assessment.epistemics) }), assessmentSchemaVersion: "1" as const, observerVersions: Object.freeze({ aegis: "1", metis: "1", nike: "1", epistemic: "1" }) });
+    } catch (error) { throw this.system1Error(error); }
+    finally { this.latestTelemetry = Object.freeze({ requestCount: 1, questionCount: 15, latencyMs: Math.round(performance.now() - started) }); }
+  }
+  private system1Error(error: unknown): TypeSafeSystem1Error { if (error instanceof TypeSafeSystem1Error) return error; if (error instanceof Error && (error.message.startsWith("TypeSafe returned") || error.message.startsWith("TypeSafe response"))) return new TypeSafeSystem1Error("INVALID_RESPONSE"); const message = error instanceof Error ? error.message.toLowerCase() : ""; if (message.includes("timeout") || message.includes("abort")) return new TypeSafeSystem1Error("TIMEOUT"); if (message.includes("api key") || message.includes("auth") || message.includes("unauthorized")) return new TypeSafeSystem1Error("AUTHENTICATION"); return new TypeSafeSystem1Error("TRANSPORT"); }
 }
 
 export function createTypeSafeSystem1(timeout = 4000, client?: TypeSafeClient): TypeSafeSystem1Runtime { return new TypeSafeSystem1Runtime(timeout, client); }

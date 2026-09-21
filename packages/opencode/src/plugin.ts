@@ -1,25 +1,13 @@
 import { join } from "node:path";
-import { createHash } from "node:crypto";
 import { Plugin } from "@opencode/plugin";
 import { EventStore, createSession, decide, isMeaningful, loadConfig, saveConfig, stagnationEligible, stateFor, stagnationScore, type Action, type AthenaConfig, type PendingReplan, type ReflexKind, type ReflexProvider, type ReplanState, type Session, type StagnationReflex, type ToolResult } from "@athena/core";
-import { DemoReflexProvider, TypeSafeReflexProvider } from "@athena/typesafe";
+import { DemoReflexProvider } from "@athena/typesafe";
 import { athenaRpc } from "./rpc.js";
+import { createTypeSafeSystem1 } from "@athena/typesafe";
+import { CognitiveRuntime } from "./cognitive-runtime.js";
 
 function actionFrom(tool: string, args: unknown): Action { return { id: crypto.randomUUID(), tool, input: JSON.stringify(args), readOnly: ["read", "glob", "grep", "list"].includes(tool), timestamp: new Date().toISOString() }; }
-function providerFor(name: "typesafe" | "demo"): ReflexProvider { return name === "demo" ? new DemoReflexProvider() : new TypeSafeReflexProvider(); }
 function extractOutput(result: { content?: string | ReadonlyArray<{ type: string; text?: string }> }): string { if (typeof result.content === "string") return result.content; if (Array.isArray(result.content)) return result.content.filter((part): part is { type: "text"; text: string } => part.type === "text").map((part) => part.text).join("\n"); return ""; }
-function instructionHash(text: string): string { return createHash("sha256").update(text).digest("hex").slice(0, 16); }
-
-const STALE_MS = 30 * 60 * 1000;
-const CONTROL_INSTRUCTION = [
-  "ATHENA CONTROL",
-  "",
-  "The current strategy is semantically stagnant.",
-  "Stop retrying superficial variations of the same approach.",
-  "Use the evidence already collected to reassess the unresolved root cause.",
-  "Choose a materially different strategy before the next meaningful action.",
-].join("\n");
-
 export class OpenCodeBridge {
   readonly session: Session;
   private lastLatencies: number[] = [];
@@ -54,9 +42,9 @@ export const AthenaPlugin = Plugin.define({
   async setup(ctx) {
     const directory = ctx.location.directory;
     let config = await loadConfig(directory);
-    let provider: ReflexProvider;
-    try { provider = providerFor(config.provider); } catch (error) { if (config.mode === "shadow") provider = new DemoReflexProvider(); else throw error; }
-    const bridge = new OpenCodeBridge(directory, "OpenCode session", provider);
+    // Legacy RPC remains available, but production V2 cognition owns all Jev calls.
+    const bridge = new OpenCodeBridge(directory, "OpenCode session", new DemoReflexProvider());
+    const cognitive = new CognitiveRuntime(createTypeSafeSystem1());
     const pendingActions = new Map<string, Action>();
     const pendingReplans = new Map<string, PendingReplan>();
     const recentEvents: Array<{ type: string; timestamp: string; metadata?: Record<string, unknown> }> = [];
@@ -120,17 +108,14 @@ export const AthenaPlugin = Plugin.define({
 
     // Tool hooks
     const toolBefore = await ctx.tool.hook("execute.before", async (input) => {
-      const evaluated = await bridge.before(input.tool, input.input);
-      pendingActions.set(input.id, evaluated.action);
-      if (evaluated.policy.decision === "deny" && !evaluated.policy.shadow) throw new Error(`ATHENA denied ${input.tool}: ${evaluated.policy.reason}`);
-      if (evaluated.policy.decision === "ask" && !evaluated.policy.shadow) throw new Error(`ATHENA requires approval for ${input.tool}: ${evaluated.policy.reason}`);
+      await cognitive.before(input.sessionID, input.id, input.tool, input.input);
     });
 
     const toolAfter = await ctx.tool.hook("execute.after", async (input) => {
+      cognitive.after(input.sessionID, input.id, input.tool, input.status, input.status === "completed" ? input.result : input.error);
       const action = pendingActions.get(input.id);
       pendingActions.delete(input.id);
-      if (!action) return;
-      if (input.status === "error") return;
+      if (!action || input.status === "error") return;
       const output = extractOutput(input.result);
       const judged = await bridge.after(action, true, output);
 
@@ -187,43 +172,20 @@ export const AthenaPlugin = Plugin.define({
       }
     });
 
-    // Context hook — inject control signal
+    const promptHook = await ctx.session.hook("prompt", async (event) => {
+      cognitive.capturePrompt(event.sessionID, event.prompt);
+    });
+
+    // Context hook — inject only queued privileged cognitive context.
     const contextHook = await ctx.session.hook("context", async (event) => {
-      const pending = pendingReplans.get(event.sessionID);
-      if (!pending || pending.consumed) return;
-      if (Date.now() - pending.createdAt > STALE_MS) { pendingReplans.delete(event.sessionID); return; }
-
-      const hash = instructionHash(CONTROL_INSTRUCTION);
-      pending.instructionHash = hash;
-      pending.consumed = true;
-      updateReplanState(pending, "injected");
-
-      event.system.push({ type: "text", text: CONTROL_INSTRUCTION });
-
-      await rpcReg.events.emit("replanInjected", {
-        replanId: pending.id,
-        sessionID: pending.sessionID,
-      });
-      await store.append({
-        timestamp: new Date().toISOString(),
-        sessionId: bridge.session.id,
-        type: "REPLAN_CONTEXT_APPLIED",
-        metadata: {
-          mode: config.mode,
-          provider: bridge.provider.name,
-          replanId: pending.id,
-          sessionID: pending.sessionID,
-          kind: "primary",
-          agent: event.agent,
-          instructionFingerprint: hash,
-        },
-      });
-      pushRecent("REPLAN_INJECTED", { replanId: pending.id, instructionFingerprint: hash });
+      const cognitiveContext = cognitive.injectContext(event.sessionID);
+      if (cognitiveContext) event.system.push({ type: "text", text: cognitiveContext });
     });
 
     return () => {
       void toolBefore.dispose();
       void toolAfter.dispose();
+      void promptHook.dispose();
       void contextHook.dispose();
       void rpcReg.dispose();
       pendingActions.clear();
