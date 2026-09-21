@@ -64,6 +64,7 @@ export {
 export {
   SYSTEM1_SNAPSHOT_SCHEMA_VERSION,
   type System1Snapshot,
+  assertSystem1Snapshot,
   CognitiveAssessmentEngine,
   createSystem1Snapshot,
 } from "./system1.js";

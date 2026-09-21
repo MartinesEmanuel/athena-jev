@@ -108,6 +108,11 @@ describe("CandidateAction", () => {
     expect(isValidCandidateAction({ id: "a", kind: "tool" })).toBe(false);
   });
 
+  it("rejects empty optional text and unknown fields", () => {
+    expect(isValidCandidateAction({ id: "a", kind: "tool", intent: "x", tool: "" })).toBe(false);
+    expect(isValidCandidateAction({ id: "a", kind: "tool", intent: "x", hidden: true })).toBe(false);
+  });
+
   it("rejects invalid kind", () => {
     expect(isValidCandidateAction({ id: "a", kind: "reason", intent: "x" })).toBe(false);
   });
@@ -125,11 +130,8 @@ describe("CandidateAction", () => {
     const typeCheck: HasChainOfThought = false as never;
     void typeCheck;
 
-    // Runtime: assertCandidateAction returns the object; extra props pass through
-    // (structural typing). The contract is enforced at the type boundary.
     const withCog = { ...valid, chainOfThought: "let me think..." };
-    const result = assertCandidateAction(withCog);
-    expect(result.kind).toBe("tool");
+    expect(() => assertCandidateAction(withCog)).toThrow();
   });
 });
 

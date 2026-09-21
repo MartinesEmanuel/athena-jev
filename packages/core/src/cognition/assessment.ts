@@ -1,6 +1,13 @@
 import type { Probability } from "./validation.js";
 import { assertProbability } from "./validation.js";
 
+function assertExactObject(value: unknown, label: string, fields: readonly string[]): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value) || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) throw new TypeError(`${label}: expected object`);
+  const item = value as Record<string, unknown>;
+  if (Object.keys(item).some((key) => !fields.includes(key)) || fields.some((key) => !(key in item))) throw new TypeError(`${label}: unexpected or missing dimensions`);
+  return item;
+}
+
 export interface SafetyAssessment {
   failureProbability: Probability;
   impactSeverity: Probability;
@@ -38,9 +45,7 @@ export interface CognitiveAssessment {
 }
 
 function assertSafety(value: unknown): SafetyAssessment {
-  if (typeof value !== "object" || value === null)
-    throw new TypeError("safety: expected object");
-  const s = value as Record<string, unknown>;
+  const s = assertExactObject(value, "safety", ["failureProbability", "impactSeverity", "irreversibility", "policyViolationProbability"]);
   return {
     failureProbability: assertProbability(s.failureProbability, "safety.failureProbability"),
     impactSeverity: assertProbability(s.impactSeverity, "safety.impactSeverity"),
@@ -53,9 +58,7 @@ function assertSafety(value: unknown): SafetyAssessment {
 }
 
 function assertProgress(value: unknown): ProgressAssessment {
-  if (typeof value !== "object" || value === null)
-    throw new TypeError("progress: expected object");
-  const p = value as Record<string, unknown>;
+  const p = assertExactObject(value, "progress", ["progressProbability", "informationGainProbability", "strategyNovelty", "stagnationProbability", "goalAlignment"]);
   return {
     progressProbability: assertProbability(p.progressProbability, "progress.progressProbability"),
     informationGainProbability: assertProbability(
@@ -69,9 +72,7 @@ function assertProgress(value: unknown): ProgressAssessment {
 }
 
 function assertCompletion(value: unknown): CompletionAssessment {
-  if (typeof value !== "object" || value === null)
-    throw new TypeError("completion: expected object");
-  const c = value as Record<string, unknown>;
+  const c = assertExactObject(value, "completion", ["goalSatisfiedProbability", "evidenceCoverage", "unresolvedObligationsProbability"]);
   return {
     goalSatisfiedProbability: assertProbability(
       c.goalSatisfiedProbability,
@@ -86,9 +87,7 @@ function assertCompletion(value: unknown): CompletionAssessment {
 }
 
 function assertEpistemics(value: unknown): EpistemicAssessment {
-  if (typeof value !== "object" || value === null)
-    throw new TypeError("epistemics: expected object");
-  const e = value as Record<string, unknown>;
+  const e = assertExactObject(value, "epistemics", ["stateUncertainty", "contextSufficiency", "contradictionProbability"]);
   return {
     stateUncertainty: assertProbability(e.stateUncertainty, "epistemics.stateUncertainty"),
     contextSufficiency: assertProbability(e.contextSufficiency, "epistemics.contextSufficiency"),
@@ -100,9 +99,7 @@ function assertEpistemics(value: unknown): EpistemicAssessment {
 }
 
 export function assertCognitiveAssessment(value: unknown): CognitiveAssessment {
-  if (typeof value !== "object" || value === null)
-    throw new TypeError("CognitiveAssessment: expected object");
-  const a = value as Record<string, unknown>;
+  const a = assertExactObject(value, "CognitiveAssessment", ["safety", "progress", "completion", "epistemics"]);
   return {
     safety: assertSafety(a.safety),
     progress: assertProgress(a.progress),

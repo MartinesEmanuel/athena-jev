@@ -13,20 +13,22 @@ export interface CandidateAction {
 export function isValidCandidateAction(
   value: unknown,
 ): value is CandidateAction {
-  if (typeof value !== "object" || value === null) return false;
+  if (typeof value !== "object" || value === null || Array.isArray(value) || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) return false;
   const obj = value as Record<string, unknown>;
+  const fields = ["id", "kind", "tool", "input", "intent", "expectedObservation", "hypothesisId"];
+  if (Object.keys(obj).some((key) => !fields.includes(key) || obj[key] === undefined)) return false;
   if (typeof obj.id !== "string" || obj.id.trim().length === 0) return false;
   if (!["tool", "answer", "complete"].includes(obj.kind as string))
     return false;
   if (typeof obj.intent !== "string" || obj.intent.trim().length === 0) return false;
-  if (obj.tool !== undefined && typeof obj.tool !== "string") return false;
-  if (obj.input !== undefined && typeof obj.input !== "string") return false;
+  if (obj.tool !== undefined && (typeof obj.tool !== "string" || obj.tool.trim().length === 0)) return false;
+  if (obj.input !== undefined && (typeof obj.input !== "string" || obj.input.trim().length === 0)) return false;
   if (
     obj.expectedObservation !== undefined &&
-    typeof obj.expectedObservation !== "string"
+    (typeof obj.expectedObservation !== "string" || obj.expectedObservation.trim().length === 0)
   )
     return false;
-  if (obj.hypothesisId !== undefined && typeof obj.hypothesisId !== "string")
+  if (obj.hypothesisId !== undefined && (typeof obj.hypothesisId !== "string" || obj.hypothesisId.trim().length === 0))
     return false;
   return true;
 }

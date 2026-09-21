@@ -16,8 +16,8 @@ export type ObligationStatus = "OPEN" | "SATISFIED" | "UNKNOWN";
 export interface GoalState {
   readonly goalId: string;
   readonly description: string;
-  readonly acceptanceCriteria: readonly string[];
-  readonly constraints: readonly string[];
+  readonly acceptanceCriteria?: readonly string[];
+  readonly constraints?: readonly string[];
 }
 
 export interface CurrentObservation {
@@ -78,10 +78,22 @@ export interface CognitiveWorldStateInput {
 }
 
 function record(value: unknown, label: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+  if (typeof value !== "object" || value === null || Array.isArray(value) || ![Object.prototype, null].includes(Object.getPrototypeOf(value))) {
     throw new TypeError(`${label}: expected object`);
   }
   return value as Record<string, unknown>;
+}
+
+function exact(value: unknown, label: string, fields: readonly string[]): Record<string, unknown> {
+  const item = record(value, label);
+  if (Object.keys(item).some((key) => !fields.includes(key))) throw new TypeError(`${label}: unexpected field`);
+  return item;
+}
+
+function optional(item: Record<string, unknown>, key: string): unknown {
+  if (!(key in item)) return undefined;
+  if (item[key] === undefined) throw new TypeError(`${key}: must be omitted instead of undefined`);
+  return item[key];
 }
 
 function text(value: unknown, label: string, optional = false): string | undefined {
@@ -114,35 +126,37 @@ function cloneCandidate(value: unknown): CandidateAction {
 }
 
 function goal(value: unknown): GoalState {
-  const item = record(value, "goal");
-  return Object.freeze({ goalId: text(item.goalId, "goal.goalId")!, description: text(item.description, "goal.description")!, acceptanceCriteria: texts(item.acceptanceCriteria ?? [], "goal.acceptanceCriteria"), constraints: texts(item.constraints ?? [], "goal.constraints") });
+  const item = exact(value, "goal", ["goalId", "description", "acceptanceCriteria", "constraints"]);
+  const acceptanceCriteria = optional(item, "acceptanceCriteria");
+  const constraints = optional(item, "constraints");
+  return Object.freeze({ goalId: text(item.goalId, "goal.goalId")!, description: text(item.description, "goal.description")!, acceptanceCriteria: texts(acceptanceCriteria === undefined ? [] : acceptanceCriteria, "goal.acceptanceCriteria"), constraints: texts(constraints === undefined ? [] : constraints, "goal.constraints") });
 }
 
 function observation(value: unknown): CurrentObservation {
-  const item = record(value, "currentObservation");
-  const errorSummary = text(item.errorSummary, "currentObservation.errorSummary", true);
+  const item = exact(value, "currentObservation", ["source", "summary", "outcome", "errorSummary"]);
+  const errorSummary = text(optional(item, "errorSummary"), "currentObservation.errorSummary", true);
   return Object.freeze({ source: text(item.source, "currentObservation.source")!, summary: text(item.summary, "currentObservation.summary")!, outcome: outcome(item.outcome, "currentObservation.outcome"), ...(errorSummary === undefined ? {} : { errorSummary }) });
 }
 
 function action(value: unknown): ActionObservation {
-  const item = record(value, "recentAction");
+  const item = exact(value, "recentAction", ["candidateId", "kind", "intent", "tool", "outcome", "informationSummary", "errorSummary"]);
   const kind = item.kind;
   if (kind !== "tool" && kind !== "answer" && kind !== "complete") throw new TypeError("recentAction.kind: invalid candidate kind");
-  const tool = text(item.tool, "recentAction.tool", true);
-  const informationSummary = text(item.informationSummary, "recentAction.informationSummary", true);
-  const errorSummary = text(item.errorSummary, "recentAction.errorSummary", true);
+  const tool = text(optional(item, "tool"), "recentAction.tool", true);
+  const informationSummary = text(optional(item, "informationSummary"), "recentAction.informationSummary", true);
+  const errorSummary = text(optional(item, "errorSummary"), "recentAction.errorSummary", true);
   return Object.freeze({ candidateId: text(item.candidateId, "recentAction.candidateId")!, kind, intent: text(item.intent, "recentAction.intent")!, outcome: outcome(item.outcome, "recentAction.outcome"), ...(tool === undefined ? {} : { tool }), ...(informationSummary === undefined ? {} : { informationSummary }), ...(errorSummary === undefined ? {} : { errorSummary }) });
 }
 
 function strategy(value: unknown): StrategyFrame {
-  const item = record(value, "recentStrategy");
-  const hypothesisId = text(item.hypothesisId, "recentStrategy.hypothesisId", true);
-  const target = text(item.target, "recentStrategy.target", true);
+  const item = exact(value, "recentStrategy", ["strategyId", "intent", "approach", "hypothesisId", "target"]);
+  const hypothesisId = text(optional(item, "hypothesisId"), "recentStrategy.hypothesisId", true);
+  const target = text(optional(item, "target"), "recentStrategy.target", true);
   return Object.freeze({ strategyId: text(item.strategyId, "recentStrategy.strategyId")!, intent: text(item.intent, "recentStrategy.intent")!, approach: text(item.approach, "recentStrategy.approach")!, ...(hypothesisId === undefined ? {} : { hypothesisId }), ...(target === undefined ? {} : { target }) });
 }
 
 function obligation(value: unknown): Obligation {
-  const item = record(value, "unresolvedObligation");
+  const item = exact(value, "unresolvedObligation", ["id", "description", "status"]);
   if (item.status !== "OPEN" && item.status !== "SATISFIED" && item.status !== "UNKNOWN") throw new TypeError("unresolvedObligation.status: invalid status");
   return Object.freeze({ id: text(item.id, "unresolvedObligation.id")!, description: text(item.description, "unresolvedObligation.description")!, status: item.status });
 }
@@ -153,14 +167,21 @@ function bounded<T>(value: unknown, label: string, limit: number, mapper: (item:
 }
 
 function environment(value: unknown): CognitiveEnvironmentState {
-  const item = value === undefined ? {} : record(value, "environment");
-  const workingMode = item.workingMode === undefined || item.workingMode === null ? null : text(item.workingMode, "environment.workingMode")!;
-  return Object.freeze({ workingMode, availableCapabilities: texts(item.availableCapabilities ?? [], "environment.availableCapabilities"), relevantConstraints: texts(item.relevantConstraints ?? [], "environment.relevantConstraints") });
+  const item = value === undefined ? {} : exact(value, "environment", ["workingMode", "availableCapabilities", "relevantConstraints"]);
+  const workingModeValue = optional(item, "workingMode");
+  const workingMode = workingModeValue === undefined || workingModeValue === null ? null : text(workingModeValue, "environment.workingMode")!;
+  const availableCapabilities = optional(item, "availableCapabilities");
+  const relevantConstraints = optional(item, "relevantConstraints");
+  return Object.freeze({ workingMode, availableCapabilities: texts(availableCapabilities === undefined ? [] : availableCapabilities, "environment.availableCapabilities"), relevantConstraints: texts(relevantConstraints === undefined ? [] : relevantConstraints, "environment.relevantConstraints") });
 }
 
 export function assertCognitiveWorldState(value: unknown): CognitiveWorldState {
-  const item = record(value, "CognitiveWorldState");
-  return Object.freeze({ goal: goal(item.goal), candidate: cloneCandidate(item.candidate), currentObservation: item.currentObservation === null || item.currentObservation === undefined ? null : observation(item.currentObservation), recentActions: bounded(item.recentActions ?? [], "recentActions", MAX_RECENT_COGNITIVE_ACTIONS, action), recentStrategies: bounded(item.recentStrategies ?? [], "recentStrategies", MAX_RECENT_STRATEGIES, strategy), unresolvedObligations: bounded(item.unresolvedObligations ?? [], "unresolvedObligations", MAX_COGNITIVE_OBLIGATIONS, obligation), environment: environment(item.environment) });
+  const item = exact(value, "CognitiveWorldState", ["goal", "candidate", "currentObservation", "recentActions", "recentStrategies", "unresolvedObligations", "environment"]);
+  const currentObservation = optional(item, "currentObservation");
+  const recentActions = optional(item, "recentActions");
+  const recentStrategies = optional(item, "recentStrategies");
+  const unresolvedObligations = optional(item, "unresolvedObligations");
+  return Object.freeze({ goal: goal(item.goal), candidate: cloneCandidate(item.candidate), currentObservation: currentObservation === undefined || currentObservation === null ? null : observation(currentObservation), recentActions: bounded(recentActions === undefined ? [] : recentActions, "recentActions", MAX_RECENT_COGNITIVE_ACTIONS, action), recentStrategies: bounded(recentStrategies === undefined ? [] : recentStrategies, "recentStrategies", MAX_RECENT_STRATEGIES, strategy), unresolvedObligations: bounded(unresolvedObligations === undefined ? [] : unresolvedObligations, "unresolvedObligations", MAX_COGNITIVE_OBLIGATIONS, obligation), environment: environment(optional(item, "environment")) });
 }
 
 export function buildCognitiveWorldState(input: CognitiveWorldStateInput): CognitiveWorldState {
