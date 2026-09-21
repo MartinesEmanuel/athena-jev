@@ -241,8 +241,8 @@ describe("Decision", () => {
 // ── ReasonCode ───────────────────────────────────────────────────────
 
 describe("ReasonCode", () => {
-  it("contains exactly 11 codes", () => {
-    expect(REASON_CODES).toHaveLength(11);
+  it("contains exactly 17 codes", () => {
+    expect(REASON_CODES).toHaveLength(17);
   });
 
   it("validates reason codes", () => {
@@ -308,6 +308,7 @@ describe("CognitiveEvent", () => {
     "CANDIDATE_PROPOSED",
     "ASSESSMENT_STARTED",
     "ASSESSMENT_COMPLETED",
+    "COGNITIVE_EVIDENCE_UPDATED",
     "COGNITIVE_DECISION",
     "DELIBERATION_REQUESTED",
     "DELIBERATION_APPLIED",
@@ -320,8 +321,8 @@ describe("CognitiveEvent", () => {
     "COGNITIVE_RUNTIME_DEGRADED",
   ];
 
-  it("has exactly 13 event types", () => {
-    expect(eventTypes).toHaveLength(13);
+  it("has exactly 14 event types", () => {
+    expect(eventTypes).toHaveLength(14);
   });
 
   it("events are discriminated by type field", () => {
@@ -349,8 +350,8 @@ describe("Version constants", () => {
     expect(COGNITIVE_ASSESSMENT_SCHEMA_VERSION).toBe("1");
   });
 
-  it("policy version is '0.2.0'", () => {
-    expect(COGNITIVE_POLICY_VERSION).toBe("0.2.0");
+  it("policy version is '0.3.0'", () => {
+    expect(COGNITIVE_POLICY_VERSION).toBe("0.3.0");
   });
 });
 

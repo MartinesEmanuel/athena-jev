@@ -80,6 +80,20 @@ export {
 } from "./decision.js";
 
 export {
+  COGNITIVE_POLICY_VERSION,
+  type CognitivePolicyConfig,
+  DEFAULT_COGNITIVE_POLICY_CONFIG,
+  type HardRuleAssessment,
+  type TemporalEvidence,
+  type CognitivePolicyResult,
+  assertCognitivePolicyConfig,
+  updateTemporalEvidence,
+  CognitivePolicy,
+  policyResultToEvidenceEvent,
+  policyResultToDecisionEvent,
+} from "./policy.js";
+
+export {
   type CognitivePhase,
   COGNITIVE_PHASES,
   isValidCognitivePhase,
@@ -97,6 +111,7 @@ export {
   type CandidateProposedEvent,
   type AssessmentStartedEvent,
   type AssessmentCompletedEvent,
+  type CognitiveEvidenceUpdatedEvent,
   type CognitiveDecisionEvent,
   type DeliberationRequestedEvent,
   type DeliberationAppliedEvent,
@@ -117,4 +132,3 @@ export {
 } from "./transition.js";
 
 export const COGNITIVE_ASSESSMENT_SCHEMA_VERSION = "1" as const;
-export const COGNITIVE_POLICY_VERSION = "0.2.0" as const;

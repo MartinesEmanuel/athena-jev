@@ -5,6 +5,7 @@ export type CognitiveEventType =
   | "CANDIDATE_PROPOSED"
   | "ASSESSMENT_STARTED"
   | "ASSESSMENT_COMPLETED"
+  | "COGNITIVE_EVIDENCE_UPDATED"
   | "COGNITIVE_DECISION"
   | "DELIBERATION_REQUESTED"
   | "DELIBERATION_APPLIED"
@@ -38,6 +39,14 @@ export interface AssessmentCompletedEvent extends CognitiveEventBase {
   readonly type: "ASSESSMENT_COMPLETED";
   readonly candidateId: string;
   readonly assessment: CognitiveAssessment;
+}
+
+export interface CognitiveEvidenceUpdatedEvent extends CognitiveEventBase {
+  readonly type: "COGNITIVE_EVIDENCE_UPDATED";
+  readonly candidateId: string;
+  readonly consecutiveLowProgress: number;
+  readonly consecutiveLowInformationGain: number;
+  readonly consecutiveHighStagnation: number;
 }
 
 export interface CognitiveDecisionEvent extends CognitiveEventBase {
@@ -101,6 +110,7 @@ export type CognitiveEvent =
   | CandidateProposedEvent
   | AssessmentStartedEvent
   | AssessmentCompletedEvent
+  | CognitiveEvidenceUpdatedEvent
   | CognitiveDecisionEvent
   | DeliberationRequestedEvent
   | DeliberationAppliedEvent
@@ -111,4 +121,3 @@ export type CognitiveEvent =
   | ActionBlockedEvent
   | ToolCompletedEvent
   | CognitiveRuntimeDegradedEvent;
-

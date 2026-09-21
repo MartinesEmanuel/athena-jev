@@ -130,6 +130,18 @@ export function transitionCognitiveState(
       };
     }
 
+    case "COGNITIVE_EVIDENCE_UPDATED": {
+      requirePhase(state, "ASSESSING", event.type);
+      requireCandidate(event, state.activeCandidateId, state);
+      if (!state.hasCompletedAssessment || state.assessmentInProgress) {
+        throw new CognitiveTransitionError("COGNITIVE_EVIDENCE_UPDATED requires completed assessment", state.phase, event.type);
+      }
+      for (const [field, value] of Object.entries({ consecutiveLowProgress: event.consecutiveLowProgress, consecutiveLowInformationGain: event.consecutiveLowInformationGain, consecutiveHighStagnation: event.consecutiveHighStagnation })) {
+        if (!Number.isInteger(value) || value < 0) throw new CognitiveTransitionError(`${field} must be a non-negative integer`, state.phase, event.type);
+      }
+      return { ...state, consecutiveLowProgress: event.consecutiveLowProgress, consecutiveLowInformationGain: event.consecutiveLowInformationGain, consecutiveHighStagnation: event.consecutiveHighStagnation };
+    }
+
     // ── COGNITIVE_DECISION ───────────────────────────────────────
     case "COGNITIVE_DECISION": {
       requirePhase(state, "ASSESSING", event.type);
