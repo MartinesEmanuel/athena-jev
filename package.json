@@ -11,6 +11,7 @@
     "test": "vitest run",
     "check": "pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "test:live": "ATHENA_LIVE_TEST=1 vitest run packages/typesafe/test/live.test.ts",
+    "cognitive:live": "pnpm --filter @athena/typesafe build && node packages/typesafe/dist/live-system1.js",
     "eval": "node evals/run.mjs",
     "eval:report": "node evals/report.mjs",
     "metis:calibrate": "node evals/metis-calibration/run.mjs",

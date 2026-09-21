@@ -15,6 +15,16 @@ export {
   type MetisJudgmentInput,
   type NikeJudgmentInput,
   type EpistemicJudgmentInput,
+  AegisObserver,
+  MetisObserver,
+  NikeObserver,
+  EpistemicObserver,
+  CognitiveAssessmentEngine,
+  type System1Snapshot,
+  CognitiveObserverError,
+  CognitivePolicy,
+  buildCognitiveWorldState,
+  initialCognitiveState,
 } from "./cognition/index.js";
 
 export type AthenaDecision = "allow" | "ask" | "deny" | "replan";
