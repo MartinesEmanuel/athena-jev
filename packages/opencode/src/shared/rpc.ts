@@ -53,6 +53,18 @@ export const athenaRpc = {
         required: ["mode"],
       },
     },
+    snapshot: {
+      input: {
+        type: "object" as const,
+        properties: { sessionID: { type: "string" } },
+        required: ["sessionID"],
+      },
+      output: {
+        type: "object" as const,
+        properties: { snapshot: { type: ["object", "null"] } },
+        required: ["snapshot"],
+      },
+    },
     recentEvents: {
       input: {
         type: "object" as const,
@@ -132,6 +144,35 @@ export const athenaRpc = {
           mode: { type: "string" },
         },
         required: ["mode"],
+      },
+    },
+    snapshot: {
+      schema: {
+        type: "object" as const,
+        properties: {
+          snapshot: { type: "object" },
+        },
+        required: ["snapshot"],
+      },
+    },
+    /** Server-side `/athena`: ask the TUI to open the expanded panel. */
+    panelRequested: {
+      schema: {
+        type: "object" as const,
+        properties: {
+          sessionID: { type: "string" },
+        },
+        required: ["sessionID"],
+      },
+    },
+    /** Server-side `/athena-mode`: inline notice for the expanded panel. */
+    commandNotice: {
+      schema: {
+        type: "object" as const,
+        properties: {
+          message: { type: "string" },
+        },
+        required: ["message"],
       },
     },
   },

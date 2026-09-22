@@ -1,10 +1,13 @@
 import type { Plugin as V1Plugin } from "@opencode-ai/plugin-v1";
 import { createTypeSafeSystem1 } from "@athena/typesafe";
-import { CognitiveRuntime } from "./cognitive-runtime.js";
-import { createHudSocketObserver } from "./hud-observer.js";
+import { CognitiveRuntime } from "../shared/cognitive-runtime.js";
+import { createHudSocketObserver } from "../shared/hud-observer.js";
+import { loadAthenaCredentials } from "../shared/credentials.js";
 
 /** OpenCode 1.x adapter. V1 exposes tool hooks and privileged system transform only. */
 export const AthenaV1Plugin: V1Plugin = async () => {
+  // ATHENA owns its credentials: never read secrets from host config.
+  loadAthenaCredentials();
   const cognitive = new CognitiveRuntime(createTypeSafeSystem1(), undefined, createHudSocketObserver());
   return {
     "chat.message": async (input, output) => {

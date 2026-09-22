@@ -106,18 +106,26 @@ describe("duplicate protection", () => {
 });
 
 describe("ATHENA RPC contract", () => {
-  it("has 4 methods: status, session, setMode, recentEvents", async () => {
-    const { athenaRpc } = await import("../src/rpc.js");
-    expect(Object.keys(athenaRpc.methods)).toEqual(["status", "session", "setMode", "recentEvents"]);
+  it("has 5 methods: status, session, setMode, snapshot, recentEvents", async () => {
+    const { athenaRpc } = await import("../src/shared/rpc.js");
+    expect(Object.keys(athenaRpc.methods)).toEqual(["status", "session", "setMode", "snapshot", "recentEvents"]);
   });
 
-  it("has 5 events: reflex, replanQueued, replanInjected, replanOutcome, modeChanged", async () => {
-    const { athenaRpc } = await import("../src/rpc.js");
-    expect(Object.keys(athenaRpc.events)).toEqual(["reflex", "replanQueued", "replanInjected", "replanOutcome", "modeChanged"]);
+  it("has 8 events: reflex, replanQueued, replanInjected, replanOutcome, modeChanged, snapshot, panelRequested, commandNotice", async () => {
+    const { athenaRpc } = await import("../src/shared/rpc.js");
+    expect(Object.keys(athenaRpc.events)).toEqual(["reflex", "replanQueued", "replanInjected", "replanOutcome", "modeChanged", "snapshot", "panelRequested", "commandNotice"]);
+  });
+
+  it("server command events carry only bounded identifier fields", async () => {
+    const { athenaRpc } = await import("../src/shared/rpc.js");
+    expect(athenaRpc.events.panelRequested.schema).toMatchObject({ required: ["sessionID"] });
+    expect(athenaRpc.events.commandNotice.schema).toMatchObject({ required: ["message"] });
+    expect(athenaRpc.events.panelRequested.schema).not.toHaveProperty("prompt");
+    expect(athenaRpc.events.commandNotice.schema).not.toHaveProperty("prompt");
   });
 
   it("status output has all required fields", async () => {
-    const { athenaRpc } = await import("../src/rpc.js");
+    const { athenaRpc } = await import("../src/shared/rpc.js");
     const required = ["mode", "provider", "providerHealthy", "jevCalls", "jevFailures", "medianLatency", "budgetUsed", "budgetLimit"];
     for (const field of required) {
       expect(athenaRpc.methods.status.output.properties).toHaveProperty(field);
@@ -126,23 +134,36 @@ describe("ATHENA RPC contract", () => {
   });
 
   it("session input requires sessionID", async () => {
-    const { athenaRpc } = await import("../src/rpc.js");
+    const { athenaRpc } = await import("../src/shared/rpc.js");
     expect(athenaRpc.methods.session.input.required).toContain("sessionID");
   });
 
   it("setMode input restricts to shadow/guardian/balanced", async () => {
-    const { athenaRpc } = await import("../src/rpc.js");
+    const { athenaRpc } = await import("../src/shared/rpc.js");
     expect(athenaRpc.methods.setMode.input.properties.mode.enum).toEqual(["shadow", "guardian", "balanced"]);
   });
 
+  it("snapshot seed takes sessionID and returns a nullable snapshot", async () => {
+    const { athenaRpc } = await import("../src/shared/rpc.js");
+    expect(athenaRpc.methods.snapshot.input.required).toContain("sessionID");
+    expect(athenaRpc.methods.snapshot.output.required).toContain("snapshot");
+    expect(athenaRpc.methods.snapshot.output.properties.snapshot.type).toEqual(["object", "null"]);
+  });
+
+  it("snapshot event carries the sanitized snapshot only", async () => {
+    const { athenaRpc } = await import("../src/shared/rpc.js");
+    expect(Object.keys(athenaRpc.events.snapshot.schema.properties)).toEqual(["snapshot"]);
+    expect(athenaRpc.events.snapshot.schema.required).toEqual(["snapshot"]);
+  });
+
   it("replanQueued event has replanId and stagnationScore", async () => {
-    const { athenaRpc } = await import("../src/rpc.js");
+    const { athenaRpc } = await import("../src/shared/rpc.js");
     expect(athenaRpc.events.replanQueued.schema.properties).toHaveProperty("replanId");
     expect(athenaRpc.events.replanQueued.schema.properties).toHaveProperty("stagnationScore");
   });
 
   it("RPC definition id is 'athena'", async () => {
-    const { athenaRpc } = await import("../src/rpc.js");
+    const { athenaRpc } = await import("../src/shared/rpc.js");
     expect(athenaRpc.id).toBe("athena");
   });
 });

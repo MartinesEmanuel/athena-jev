@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CognitiveAssessment, System1Snapshot } from "@athena/core";
-import type { AthenaHudObserver, AthenaHudSnapshot } from "@athena/hud-protocol";
+import type { AthenaHudObserver, AthenaHudSnapshot, AthenaUiSnapshot } from "@athena/hud-protocol";
 import { CognitiveRuntime, type System1Runtime } from "../src/index.js";
 
 function assessment(overrides: Record<string, unknown> = {}): CognitiveAssessment {
@@ -94,5 +94,77 @@ describe("CognitiveRuntime", () => {
     const runtime = new CognitiveRuntime({ async assess() { throw new Error("provider secret"); } }, undefined, { publish: (snapshot) => { snapshots.push(snapshot); } });
     await expect(runtime.before("session", "one", "read", {})).rejects.toThrow("System-1 assessment unavailable");
     expect(snapshots.at(-1)).toMatchObject({ status: "DEGRADED", decision: "DENY", reason: "System-1 assessment unavailable" });
+  });
+
+  const flush = () => new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+
+  it("publishes sanitized UI snapshots and isolates UI observer failures", async () => {
+    const ui: AthenaUiSnapshot[] = [];
+    const runtime = new CognitiveRuntime(fake(assessment()), undefined, undefined, {
+      publish(snapshot) {
+        ui.push(snapshot);
+        if (ui.length % 2 === 1) throw new Error("sync observer failure");
+        return Promise.reject(new Error("async observer failure"));
+      },
+    });
+    // Both a throwing and a rejecting UI observer must leave cognition intact.
+    await expect(runtime.before("session", "one", "read", { token: "hunter2-secret" })).resolves.toMatchObject({ decision: "GO" });
+    await flush();
+    expect(ui.length).toBeGreaterThanOrEqual(3);
+    expect(ui.at(-1)).toMatchObject({ phase: "GO", aegis: "SAFE", metis: "PROGRESSING" });
+    // Only redacted, bounded, terminal-safe data crosses into the UI.
+    expect(JSON.stringify(ui)).not.toContain("hunter2-secret");
+    expect(JSON.stringify(ui)).not.toContain("read");
+    runtime.after("session", "one", "read", "completed", "output");
+    expect(runtime.summary("session")).toMatchObject({ lastDecision: "GO" });
+  });
+
+  it("carries domains across non-assessment publishes and clears them on DEGRADED", async () => {
+    const ui: AthenaUiSnapshot[] = [];
+    let failing = false;
+    const system1: System1Runtime & { calls: number } = {
+      calls: 0,
+      async assess(world): Promise<System1Snapshot> {
+        if (failing) throw new Error("provider down");
+        this.calls++;
+        return { worldState: world, assessment: assessment(), assessmentSchemaVersion: "1", observerVersions: { aegis: "1", metis: "1", nike: "1", epistemic: "1" } };
+      },
+    };
+    const runtime = new CognitiveRuntime(system1, undefined, undefined, { publish: (snapshot) => { ui.push(snapshot); } });
+    await runtime.before("session", "one", "read", {});
+    runtime.after("session", "one", "read", "completed", "done");
+    await flush();
+    const firstCycle = ui.filter((snapshot) => snapshot.phase === "ASSESSING");
+    expect(firstCycle).toHaveLength(1);
+    // No reading exists before the first assessment.
+    expect(firstCycle[0]?.aegis).toBeUndefined();
+    // A tool-result publish has no assessment but must keep the last readings.
+    expect(ui.at(-1)).toMatchObject({ phase: "GO", aegis: "SAFE" });
+
+    // DEGRADED must never show stale domains, while the ASSESSING publish
+    // just before it still carries the last real readings forward.
+    failing = true;
+    await expect(runtime.before("session", "two", "read", {})).rejects.toThrow("System-1 assessment unavailable");
+    await flush();
+    const assessing = ui.filter((snapshot) => snapshot.phase === "ASSESSING");
+    expect(assessing).toHaveLength(2);
+    expect(assessing[1]).toMatchObject({ aegis: "SAFE" });
+    const degraded = ui.at(-1);
+    expect(degraded).toMatchObject({ phase: "DEGRADED" });
+    expect(degraded?.aegis).toBeUndefined();
+    expect(JSON.stringify(degraded)).not.toContain("aegis");
+  });
+
+  it("projects VERIFY and keeps UI counters independent of interventions", async () => {
+    const ui: AthenaUiSnapshot[] = [];
+    const system1 = fake(assessment({ completion: { goalSatisfiedProbability: 0.9, evidenceCoverage: 0.1, unresolvedObligationsProbability: 0.9 } }));
+    const runtime = new CognitiveRuntime(system1, undefined, undefined, { publish: (snapshot) => { ui.push(snapshot); } });
+    await expect(runtime.before("session", "verify", "bash", { command: "finish" })).rejects.toThrow("ATHENA verification required");
+    await flush();
+    const verify = ui.at(-1);
+    expect(verify).toMatchObject({ phase: "VERIFY", nike: "NEEDS_EVIDENCE" });
+    // strategyShifts must never absorb the interventions tally.
+    expect(verify?.session?.strategyShifts).toBe(0);
+    expect(runtime.counters("session").interventions).toBe(1);
   });
 });

@@ -1,1 +1,1 @@
-{ "extends": "../../tsconfig.json", "compilerOptions": { "rootDir": "src", "outDir": "dist", "jsx": "preserve", "jsxImportSource": "solid-js" }, "include": ["src"] }
+{ "extends": "../../tsconfig.json", "compilerOptions": { "rootDir": "src", "outDir": "dist", "jsx": "preserve", "jsxImportSource": "@opentui/solid" }, "include": ["src"] }

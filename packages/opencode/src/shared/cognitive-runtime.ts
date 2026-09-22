@@ -1,6 +1,6 @@
 import { CognitivePolicy, assessStrategyShift, buildCognitiveWorldState, buildDeliberationRequest, initialCognitiveState, normalizeText, policyResultToDecisionEvent, policyResultToEvidenceEvent, renderDeliberationContext, transitionCognitiveState, type CognitiveState, type StrategyFrame, type System1Snapshot } from "@athena/core";
-import { createHash } from "node:crypto";
 import { createAthenaHudSnapshot, type AthenaHudObserver, type AthenaHudSnapshot, type AthenaHudTimelineEvent } from "@athena/hud-protocol";
+import { athenaSessionRef, buildAthenaUiSnapshot, uiDecision, type AthenaUiCounters, type AthenaUiDecisionNote, type AthenaUiObserver } from "./ui-snapshot.js";
 
 const MAX_GOAL_LENGTH = 1000;
 const MAX_EVIDENCE_LENGTH = 1000;
@@ -62,6 +62,8 @@ interface RuntimeSession {
   awaitingStrategy: StrategyFrame | null;
   counters: CognitiveSessionCounters;
   hudTimeline: AthenaHudTimelineEvent[];
+  lastUiDecision: AthenaUiDecisionNote | null;
+  lastUiAssessment?: System1Snapshot["assessment"];
 }
 
 function emptyCounters(): CognitiveSessionCounters {
@@ -96,6 +98,7 @@ export class CognitiveRuntime {
     private readonly system1: System1Runtime,
     private readonly policy = new CognitivePolicy(),
     private readonly hudObserver?: AthenaHudObserver,
+    private readonly uiObserver?: AthenaUiObserver,
   ) {}
 
   capturePrompt(sessionID: string, prompt: unknown): void {
@@ -139,17 +142,21 @@ export class CognitiveRuntime {
     const result = this.policy.evaluate(snapshot.assessment, session.state, snapshot.worldState);
     this.apply(session, policyResultToEvidenceEvent(result, candidateId, new Date().toISOString(), sessionID));
     this.apply(session, policyResultToDecisionEvent(result, snapshot.assessment, candidateId, new Date().toISOString(), sessionID));
+    // Decision counters move before the DECISION snapshot so an observer never
+    // sees a decision whose own tally is still stale.
+    if (result.decision === "GO") session.counters = { ...session.counters, allowed: session.counters.allowed + 1 };
+    if (result.decision === "BLOCK") session.counters = { ...session.counters, blocked: session.counters.blocked + 1 };
+    if (result.decision === "DELIBERATE") session.counters = { ...session.counters, deliberations: session.counters.deliberations + 1, interventions: session.counters.interventions + 1 };
+    if (result.decision === "VERIFY") session.counters = { ...session.counters, verifications: session.counters.verifications + 1, interventions: session.counters.interventions + 1 };
     this.publishHud(sessionID, session, "DECISION", result.decision, hudDecision(result.decision), hudReason(result.decision), snapshot.assessment);
     trace("cycle", { sessionID, cycle: session.counters.assessments, worldChars: worldStateChars, evidence: world.recentActions.length + (world.currentObservation ? 1 : 0), untrustedEvidence: world.recentActions.filter((item) => item.provenance.trust === "UNTRUSTED").length + (world.currentObservation?.provenance.trust === "UNTRUSTED" ? 1 : 0), jevRequests: telemetry?.requestCount ?? 0, jevQuestions: telemetry?.questionCount ?? 0, jevLatencyMs: telemetry?.latencyMs ?? 0, decision: result.decision, failure: snapshot.assessment.safety.failureProbability, impactSeverity: snapshot.assessment.safety.impactSeverity, irreversibility: snapshot.assessment.safety.irreversibility, policyViolation: snapshot.assessment.safety.policyViolationProbability, progress: snapshot.assessment.progress.progressProbability, informationGain: snapshot.assessment.progress.informationGainProbability, novelty: snapshot.assessment.progress.strategyNovelty, stagnation: snapshot.assessment.progress.stagnationProbability, goalAlignment: snapshot.assessment.progress.goalAlignment, goalSatisfied: snapshot.assessment.completion.goalSatisfiedProbability, evidenceCoverage: snapshot.assessment.completion.evidenceCoverage, unresolved: snapshot.assessment.completion.unresolvedObligationsProbability, uncertainty: snapshot.assessment.epistemics.stateUncertainty, contextSufficiency: snapshot.assessment.epistemics.contextSufficiency, contradiction: snapshot.assessment.epistemics.contradictionProbability });
 
     if (result.decision === "GO") {
       this.apply(session, { type: "ACTION_ALLOWED", candidateId, timestamp: new Date().toISOString(), sessionId: sessionID });
-      session.counters = { ...session.counters, allowed: session.counters.allowed + 1 };
       this.publishHud(sessionID, session, "ACTION", "GO", "ALLOW", "Action allowed", snapshot.assessment);
       return result;
     }
     if (result.decision === "BLOCK") {
-      session.counters = { ...session.counters, blocked: session.counters.blocked + 1 };
       throw new Error(`ATHENA blocked ${tool}: ${result.reasons.join(", ")}`);
     }
     if (result.decision === "DELIBERATE") {
@@ -158,13 +165,11 @@ export class CognitiveRuntime {
       this.apply(session, { type: "DELIBERATION_REQUESTED", candidateId, reasons: result.reasons, timestamp: new Date().toISOString(), sessionId: sessionID });
       this.apply(session, { type: "DELIBERATION_APPLIED", candidateId, outcome: "CONTEXT_QUEUED", timestamp: new Date().toISOString(), sessionId: sessionID });
       session.pendingContext = { decision: "DELIBERATE", text: context.text, strategy: request.currentStrategy };
-      session.counters = { ...session.counters, deliberations: session.counters.deliberations + 1, interventions: session.counters.interventions + 1 };
       this.publishHud(sessionID, session, "SYSTEM2", "SYSTEM2", "REPLAN", "Deliberation context queued", snapshot.assessment);
       throw new Error(`ATHENA deliberation required for ${tool}: ${result.reasons.join(", ")}`);
     }
     this.apply(session, { type: "VERIFICATION_REQUESTED", candidateId, timestamp: new Date().toISOString(), sessionId: sessionID });
     session.pendingContext = { decision: "VERIFY", text: VERIFY_CONTEXT, strategy: { strategyId: candidateId, intent: candidate.intent, approach: candidate.tool } };
-    session.counters = { ...session.counters, verifications: session.counters.verifications + 1, interventions: session.counters.interventions + 1 };
     this.publishHud(sessionID, session, "VERIFY", "VERIFY", "ASK", "Verification required", snapshot.assessment);
     throw new Error(`ATHENA verification required for ${tool}: ${result.reasons.join(", ")}`);
   }
@@ -204,7 +209,7 @@ export class CognitiveRuntime {
   private session(sessionID: string): RuntimeSession {
     let session = this.sessions.get(sessionID);
     if (!session) {
-      session = { goal: "OpenCode task", state: initialCognitiveState(), events: [], recentActions: [], recentStrategies: [], observation: null, pendingContext: null, awaitingStrategy: null, counters: emptyCounters(), hudTimeline: [] };
+      session = { goal: "OpenCode task", state: initialCognitiveState(), events: [], recentActions: [], recentStrategies: [], observation: null, pendingContext: null, awaitingStrategy: null, counters: emptyCounters(), hudTimeline: [], lastUiDecision: null };
       this.sessions.set(sessionID, session);
     }
     return session;
@@ -243,12 +248,21 @@ export class CognitiveRuntime {
     reason: string,
     assessment?: System1Snapshot["assessment"],
   ): void {
-    if (!this.hudObserver) return;
+    if (!this.hudObserver && !this.uiObserver) return;
     const timestamp = Date.now();
     session.hudTimeline = [...session.hudTimeline, { timestamp, type, status, decision, reason }].slice(-HUD_TIMELINE_LIMIT);
+    // The UI projection carries the last real domain readings forward so the
+    // panel keeps showing them on publishes without an assessment (tool
+    // results, System-2 notes). DEGRADED must never show stale domains.
+    const uiAssessment = assessment ?? (status === "DEGRADED" ? undefined : session.lastUiAssessment);
+    if (assessment) session.lastUiAssessment = assessment;
+    if (type === "DECISION") {
+      const note = uiDecision(decision);
+      session.lastUiDecision = note ? { decision: note, shortReason: reason } : null;
+    }
     try {
       const snapshot = createAthenaHudSnapshot({
-        sessionId: `session-${createHash("sha256").update(sessionID).digest("hex").slice(0, 16)}`,
+        sessionId: athenaSessionRef(sessionID),
         timestamp,
         status,
         decision,
@@ -262,15 +276,34 @@ export class CognitiveRuntime {
         session: { actions: session.counters.candidates, meaningfulActions: session.counters.allowed, replans: session.counters.interventions, system1Calls: session.counters.assessments, system2Calls: session.counters.deliberations + session.counters.verifications },
         timeline: session.hudTimeline,
       });
+      const counters: AthenaUiCounters = {
+        cycles: session.counters.assessments,
+        deliberations: session.counters.deliberations,
+        verifications: session.counters.verifications,
+        blocks: session.counters.blocked,
+        strategyShifts: session.counters.meaningfulStrategyShifts,
+        jevRequests: session.counters.jevRequests,
+        jevLatencyMs: session.counters.jevRequests === 0 ? 0 : Math.round(session.counters.jevTotalLatencyMs / session.counters.jevRequests),
+      };
+      const lastDecision = session.lastUiDecision ?? undefined;
       queueMicrotask(() => {
-        try {
-          void Promise.resolve(this.hudObserver?.publish(snapshot)).catch(() => undefined);
-        } catch {
-          // Observer failures must never affect cognition.
+        if (this.hudObserver) {
+          try {
+            void Promise.resolve(this.hudObserver.publish(snapshot)).catch(() => undefined);
+          } catch {
+            // Observer failures must never affect cognition.
+          }
+        }
+        if (this.uiObserver) {
+          try {
+            void Promise.resolve(this.uiObserver.publish(buildAthenaUiSnapshot({ hud: snapshot, assessment: uiAssessment, counters, lastDecision }))).catch(() => undefined);
+          } catch {
+            // Observer failures must never affect cognition.
+          }
         }
       });
     } catch {
-      // HUD telemetry must never affect cognition.
+      // HUD/UI telemetry must never affect cognition.
     }
   }
 }

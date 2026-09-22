@@ -13,8 +13,12 @@
       "default": "./dist/index.js"
     },
     "./tui": {
-      "types": "./dist/tui.d.ts",
-      "default": "./dist/tui.jsx"
+      "types": "./dist/v2/tui/tui.d.ts",
+      "default": "./dist/v2/tui/tui.jsx"
+    },
+    "./plugin": {
+      "types": "./dist/v2/runtime/plugin.d.ts",
+      "default": "./dist/v2/runtime/plugin.js"
     }
   },
   "scripts": {

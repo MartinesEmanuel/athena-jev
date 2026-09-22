@@ -101,3 +101,89 @@ export const hudSystem2Label: Record<z.infer<typeof hudSystem2Schema>["state"], 
 export const hudTimelineLabel: Record<AthenaHudTimelineEvent["type"], string> = {
   ASSESSMENT: "Assessment", DECISION: "Decision", ACTION: "Action", VERIFY: "Verify", SYSTEM2: "System 2", DEGRADED: "Degraded",
 };
+
+// ── ATHENA UI snapshot ───────────────────────────────────────────────────────
+//
+// Presentation contract for the native OpenCode V2 TUI. It is derived from an
+// already-redacted `AthenaHudSnapshot` plus bounded session counters, so the
+// terminal can only ever receive enum codes, bounded integers and one redacted
+// short reason. Prompts, chain-of-thought, tool inputs, tool outputs, provider
+// responses and secrets are structurally absent.
+
+export const ATHENA_UI_VERSION = 1 as const;
+
+export const athenaUiPhaseSchema = z.enum(["ASSESSING", "GO", "DELIBERATE", "VERIFY", "BLOCK", "SYSTEM2", "DEGRADED"]);
+export const athenaUiAegisSchema = z.enum(["SAFE", "CAUTION", "DANGER"]);
+export const athenaUiMetisSchema = z.enum(["PROGRESSING", "EXPLORING", "STAGNATING"]);
+export const athenaUiNikeSchema = z.enum(["WORKING", "NEEDS_EVIDENCE", "COMPLETE"]);
+export const athenaUiEpistemicsSchema = z.enum(["CLEAR", "UNCERTAIN", "CONTRADICTORY"]);
+export const athenaUiDecisionValueSchema = z.enum(["GO", "DELIBERATE", "VERIFY", "BLOCK"]);
+
+export const athenaUiJevSchema = z.object({
+  requests: z.number().int().min(0).max(1_000_000),
+  latencyMs: z.number().int().min(0).max(600_000).optional(),
+}).strict();
+
+export const athenaUiSessionSchema = z.object({
+  cycles: z.number().int().min(0).max(1_000_000),
+  deliberations: z.number().int().min(0).max(100_000),
+  verifications: z.number().int().min(0).max(100_000),
+  blocks: z.number().int().min(0).max(100_000),
+  strategyShifts: z.number().int().min(0).max(100_000),
+}).strict();
+
+export const athenaUiLastDecisionSchema = z.object({
+  decision: athenaUiDecisionValueSchema,
+  shortReason: redactedText(96).optional(),
+}).strict();
+
+export const athenaUiSnapshotSchema = z.object({
+  version: z.literal(ATHENA_UI_VERSION),
+  sessionRef: identifier,
+  timestamp: z.number().int().nonnegative(),
+  phase: athenaUiPhaseSchema,
+  aegis: athenaUiAegisSchema.optional(),
+  metis: athenaUiMetisSchema.optional(),
+  nike: athenaUiNikeSchema.optional(),
+  epistemics: athenaUiEpistemicsSchema.optional(),
+  jev: athenaUiJevSchema.optional(),
+  session: athenaUiSessionSchema.optional(),
+  lastDecision: athenaUiLastDecisionSchema.optional(),
+  timeline: z.array(athenaUiPhaseSchema).max(16),
+}).strict();
+
+export type AthenaUiSnapshot = z.infer<typeof athenaUiSnapshotSchema>;
+export type AthenaUiPhase = z.infer<typeof athenaUiPhaseSchema>;
+export type AthenaUiAegis = z.infer<typeof athenaUiAegisSchema>;
+export type AthenaUiMetis = z.infer<typeof athenaUiMetisSchema>;
+export type AthenaUiNike = z.infer<typeof athenaUiNikeSchema>;
+export type AthenaUiEpistemics = z.infer<typeof athenaUiEpistemicsSchema>;
+export type AthenaUiSession = z.infer<typeof athenaUiSessionSchema>;
+export type AthenaUiJev = z.infer<typeof athenaUiJevSchema>;
+export type AthenaUiDecision = z.infer<typeof athenaUiDecisionValueSchema>;
+
+/** Cognitive state symbols. Presentation only; snapshot values stay stable machine codes. */
+export const athenaUiPhaseSymbol: Record<AthenaUiPhase, string> = {
+  ASSESSING: "◌", GO: "●", DELIBERATE: "◆", VERIFY: "◇", BLOCK: "■", SYSTEM2: "◈", DEGRADED: "!",
+};
+
+/** Phase shown in the compact panel for the calm resting posture. */
+export const athenaUiCalmPhase: AthenaUiPhase = "GO";
+
+export function parseAthenaUiSnapshot(value: unknown): AthenaUiSnapshot {
+  return athenaUiSnapshotSchema.parse(value);
+}
+
+/** Validates and redacts an outgoing UI snapshot. Never accept raw runtime text. */
+export function createAthenaUiSnapshot(value: Omit<AthenaUiSnapshot, "version">): AthenaUiSnapshot {
+  const reason = value.lastDecision?.shortReason;
+  const lastDecision = value.lastDecision
+    ? { decision: value.lastDecision.decision, ...(reason ? { shortReason: redactHudText(reason, 96) || "no details" } : {}) }
+    : undefined;
+  return athenaUiSnapshotSchema.parse({
+    ...value,
+    version: ATHENA_UI_VERSION,
+    lastDecision,
+    timeline: value.timeline.slice(-16),
+  });
+}

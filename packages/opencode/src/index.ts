@@ -1,6 +1,10 @@
-export { OpenCodeBridge, AthenaPlugin } from "./plugin.js";
-export { CognitiveRuntime, getCognitiveSessionCounters, getCognitiveSessionSummary, type CognitiveSessionCounters, type CognitiveSessionSummary, type System1Runtime } from "./cognitive-runtime.js";
-export { createHudSocketObserver } from "./hud-observer.js";
-export { AthenaV1Plugin } from "./v1.js";
-export { athenaRpc } from "./rpc.js";
+export { OpenCodeBridge, extractOutput } from "./shared/bridge.js";
+export { CognitiveRuntime, getCognitiveSessionCounters, getCognitiveSessionSummary, type CognitiveSessionCounters, type CognitiveSessionSummary, type System1Runtime } from "./shared/cognitive-runtime.js";
+export { createHudSocketObserver } from "./shared/hud-observer.js";
+export { athenaRpc } from "./shared/rpc.js";
+export { athenaSessionRef, buildAthenaUiSnapshot, type AthenaUiCounters, type AthenaUiDecisionNote, type AthenaUiInput, type AthenaUiObserver } from "./shared/ui-snapshot.js";
+export { athenaCredentialPaths, loadAthenaCredentials, parseCredentialFile, type AthenaCredentialLoad } from "./shared/credentials.js";
+export { ATHENA_MODES, athenaModeNotice, parseAthenaMode, type AthenaMode } from "./shared/commands.js";
+export { AthenaPlugin, default as athenaRuntimePlugin } from "./v2/runtime/plugin.js";
+export { AthenaV1Plugin } from "./v1/plugin.js";
 export type { Plugin } from "@opencode/plugin";
