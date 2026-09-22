@@ -1,7 +1,10 @@
 import { CognitivePolicy, assessStrategyShift, buildCognitiveWorldState, buildDeliberationRequest, initialCognitiveState, normalizeText, policyResultToDecisionEvent, policyResultToEvidenceEvent, renderDeliberationContext, transitionCognitiveState, type CognitiveState, type StrategyFrame, type System1Snapshot } from "@athena/core";
+import { createHash } from "node:crypto";
+import { createAthenaHudSnapshot, type AthenaHudObserver, type AthenaHudSnapshot, type AthenaHudTimelineEvent } from "@athena/hud-protocol";
 
 const MAX_GOAL_LENGTH = 1000;
 const MAX_EVIDENCE_LENGTH = 1000;
+const HUD_TIMELINE_LIMIT = 12;
 const VERIFY_CONTEXT = [
   "ATHENA VERIFICATION REQUIRED",
   "",
@@ -58,6 +61,7 @@ interface RuntimeSession {
   pendingContext: PendingContext | null;
   awaitingStrategy: StrategyFrame | null;
   counters: CognitiveSessionCounters;
+  hudTimeline: AthenaHudTimelineEvent[];
 }
 
 function emptyCounters(): CognitiveSessionCounters {
@@ -81,13 +85,18 @@ function promptText(value: unknown): string {
 
 function trace(event: string, fields: Record<string, string | number | boolean>): void {
   if (process.env.ATHENA_COGNITIVE_TRACE !== "1") return;
+
   console.info("[athena:cognitive]", event, Object.entries(fields).map(([key, value]) => `${key}=${value}`).join(" "));
 }
 
 export class CognitiveRuntime {
   private readonly sessions = new Map<string, RuntimeSession>();
 
-  constructor(private readonly system1: System1Runtime, private readonly policy = new CognitivePolicy()) {}
+  constructor(
+    private readonly system1: System1Runtime,
+    private readonly policy = new CognitivePolicy(),
+    private readonly hudObserver?: AthenaHudObserver,
+  ) {}
 
   capturePrompt(sessionID: string, prompt: unknown): void {
     const session = this.session(sessionID);
@@ -113,12 +122,14 @@ export class CognitiveRuntime {
     const worldStateChars = JSON.stringify(world).length;
     this.apply(session, { type: "CANDIDATE_PROPOSED", candidateId, kind: "tool", intent: candidate.intent, timestamp, sessionId: sessionID });
     this.apply(session, { type: "ASSESSMENT_STARTED", candidateId, timestamp, sessionId: sessionID });
+    this.publishHud(sessionID, session, "ASSESSMENT", "ASSESSING", "NONE", "System-1 assessment started");
     let snapshot: System1Snapshot;
     try {
       snapshot = await this.system1.assess(world);
     } catch {
       this.apply(session, { type: "COGNITIVE_RUNTIME_DEGRADED", error: "System-1 assessment failed", timestamp: new Date().toISOString(), sessionId: sessionID });
       session.counters = { ...session.counters, degraded: session.counters.degraded + 1 };
+      this.publishHud(sessionID, session, "DEGRADED", "DEGRADED", "DENY", "System-1 assessment unavailable");
       trace("degraded", { sessionID, candidates: session.counters.candidates });
       throw new Error("ATHENA blocked tool: System-1 assessment unavailable");
     }
@@ -128,11 +139,13 @@ export class CognitiveRuntime {
     const result = this.policy.evaluate(snapshot.assessment, session.state, snapshot.worldState);
     this.apply(session, policyResultToEvidenceEvent(result, candidateId, new Date().toISOString(), sessionID));
     this.apply(session, policyResultToDecisionEvent(result, snapshot.assessment, candidateId, new Date().toISOString(), sessionID));
+    this.publishHud(sessionID, session, "DECISION", result.decision, hudDecision(result.decision), hudReason(result.decision), snapshot.assessment);
     trace("cycle", { sessionID, cycle: session.counters.assessments, worldChars: worldStateChars, evidence: world.recentActions.length + (world.currentObservation ? 1 : 0), untrustedEvidence: world.recentActions.filter((item) => item.provenance.trust === "UNTRUSTED").length + (world.currentObservation?.provenance.trust === "UNTRUSTED" ? 1 : 0), jevRequests: telemetry?.requestCount ?? 0, jevQuestions: telemetry?.questionCount ?? 0, jevLatencyMs: telemetry?.latencyMs ?? 0, decision: result.decision, failure: snapshot.assessment.safety.failureProbability, impactSeverity: snapshot.assessment.safety.impactSeverity, irreversibility: snapshot.assessment.safety.irreversibility, policyViolation: snapshot.assessment.safety.policyViolationProbability, progress: snapshot.assessment.progress.progressProbability, informationGain: snapshot.assessment.progress.informationGainProbability, novelty: snapshot.assessment.progress.strategyNovelty, stagnation: snapshot.assessment.progress.stagnationProbability, goalAlignment: snapshot.assessment.progress.goalAlignment, goalSatisfied: snapshot.assessment.completion.goalSatisfiedProbability, evidenceCoverage: snapshot.assessment.completion.evidenceCoverage, unresolved: snapshot.assessment.completion.unresolvedObligationsProbability, uncertainty: snapshot.assessment.epistemics.stateUncertainty, contextSufficiency: snapshot.assessment.epistemics.contextSufficiency, contradiction: snapshot.assessment.epistemics.contradictionProbability });
 
     if (result.decision === "GO") {
       this.apply(session, { type: "ACTION_ALLOWED", candidateId, timestamp: new Date().toISOString(), sessionId: sessionID });
       session.counters = { ...session.counters, allowed: session.counters.allowed + 1 };
+      this.publishHud(sessionID, session, "ACTION", "GO", "ALLOW", "Action allowed", snapshot.assessment);
       return result;
     }
     if (result.decision === "BLOCK") {
@@ -146,11 +159,13 @@ export class CognitiveRuntime {
       this.apply(session, { type: "DELIBERATION_APPLIED", candidateId, outcome: "CONTEXT_QUEUED", timestamp: new Date().toISOString(), sessionId: sessionID });
       session.pendingContext = { decision: "DELIBERATE", text: context.text, strategy: request.currentStrategy };
       session.counters = { ...session.counters, deliberations: session.counters.deliberations + 1, interventions: session.counters.interventions + 1 };
+      this.publishHud(sessionID, session, "SYSTEM2", "SYSTEM2", "REPLAN", "Deliberation context queued", snapshot.assessment);
       throw new Error(`ATHENA deliberation required for ${tool}: ${result.reasons.join(", ")}`);
     }
     this.apply(session, { type: "VERIFICATION_REQUESTED", candidateId, timestamp: new Date().toISOString(), sessionId: sessionID });
     session.pendingContext = { decision: "VERIFY", text: VERIFY_CONTEXT, strategy: { strategyId: candidateId, intent: candidate.intent, approach: candidate.tool } };
     session.counters = { ...session.counters, verifications: session.counters.verifications + 1, interventions: session.counters.interventions + 1 };
+    this.publishHud(sessionID, session, "VERIFY", "VERIFY", "ASK", "Verification required", snapshot.assessment);
     throw new Error(`ATHENA verification required for ${tool}: ${result.reasons.join(", ")}`);
   }
 
@@ -164,6 +179,7 @@ export class CognitiveRuntime {
     session.recentActions = [...session.recentActions, { candidateId, kind: "tool" as const, tool, intent: tool, outcome, ...(status === "completed" ? { informationSummary: summary } : { errorSummary: summary }), provenance: observation.provenance }].slice(-12);
     session.recentStrategies = [...session.recentStrategies, { strategyId: `tool-${candidateId}`, intent: tool, approach: tool, provenance: { source: "ATHENA" as const, epistemicStatus: "PROPOSED" as const, trust: "UNTRUSTED" as const } }].slice(-6);
     this.apply(session, { type: "TOOL_COMPLETED", candidateId, timestamp: new Date().toISOString(), sessionId: sessionID });
+    this.publishHud(sessionID, session, "ACTION", "GO", "ALLOW", status === "completed" ? "Tool result observed" : "Tool error observed");
     trace("observed", { sessionID, status, actions: session.recentActions.length });
   }
 
@@ -173,6 +189,7 @@ export class CognitiveRuntime {
     if (!pending) return null;
     session.pendingContext = null;
     if (pending.decision === "DELIBERATE") session.awaitingStrategy = pending.strategy;
+    this.publishHud(sessionID, session, "SYSTEM2", "SYSTEM2", pending.decision === "DELIBERATE" ? "REPLAN" : "ASK", "Cognitive context injected");
     trace("context", { sessionID, decision: pending.decision });
     return pending.text;
   }
@@ -187,7 +204,7 @@ export class CognitiveRuntime {
   private session(sessionID: string): RuntimeSession {
     let session = this.sessions.get(sessionID);
     if (!session) {
-      session = { goal: "OpenCode task", state: initialCognitiveState(), events: [], recentActions: [], recentStrategies: [], observation: null, pendingContext: null, awaitingStrategy: null, counters: emptyCounters() };
+      session = { goal: "OpenCode task", state: initialCognitiveState(), events: [], recentActions: [], recentStrategies: [], observation: null, pendingContext: null, awaitingStrategy: null, counters: emptyCounters(), hudTimeline: [] };
       this.sessions.set(sessionID, session);
     }
     return session;
@@ -207,6 +224,7 @@ export class CognitiveRuntime {
       session.counters = shift?.strategyChanged ? { ...session.counters, meaningfulStrategyShifts: session.counters.meaningfulStrategyShifts + 1 } : { ...session.counters, noMeaningfulStrategyShifts: session.counters.noMeaningfulStrategyShifts + 1 };
       session.awaitingStrategy = null;
       this.apply(session, { type: "STRATEGY_SHIFT_OBSERVED", candidateId, from: "previous strategy", to: `${tool}: ${compact(tool, 120)}`, timestamp, sessionId: sessionID });
+      this.publishHud(sessionID, session, "SYSTEM2", "SYSTEM2", shift?.strategyChanged ? "REPLAN" : "NONE", shift?.strategyChanged ? "Strategy shift observed" : "Strategy unchanged");
     }
     if (session.state.phase === "AWAITING_VERIFICATION") {
       const candidateId = session.state.pendingVerificationCandidateId!;
@@ -215,6 +233,85 @@ export class CognitiveRuntime {
     if (session.state.phase === "DEGRADED") throw new Error("ATHENA blocked tool: cognitive runtime degraded");
     if (session.state.phase !== "READY") throw new Error(`ATHENA blocked tool: unresolved cognitive lifecycle before ${nextCandidateId}`);
   }
+
+  private publishHud(
+    sessionID: string,
+    session: RuntimeSession,
+    type: AthenaHudTimelineEvent["type"],
+    status: AthenaHudSnapshot["status"],
+    decision: AthenaHudSnapshot["decision"],
+    reason: string,
+    assessment?: System1Snapshot["assessment"],
+  ): void {
+    if (!this.hudObserver) return;
+    const timestamp = Date.now();
+    session.hudTimeline = [...session.hudTimeline, { timestamp, type, status, decision, reason }].slice(-HUD_TIMELINE_LIMIT);
+    try {
+      const snapshot = createAthenaHudSnapshot({
+        sessionId: `session-${createHash("sha256").update(sessionID).digest("hex").slice(0, 16)}`,
+        timestamp,
+        status,
+        decision,
+        reason,
+        system1: hudSystem1(assessment),
+        aegis: hudAegis(assessment),
+        metis: hudMetis(assessment),
+        nike: hudNike(assessment),
+        epistemics: hudEpistemics(assessment),
+        system2: { state: status === "SYSTEM2" ? "QUEUED" : "IDLE" },
+        session: { actions: session.counters.candidates, meaningfulActions: session.counters.allowed, replans: session.counters.interventions, system1Calls: session.counters.assessments, system2Calls: session.counters.deliberations + session.counters.verifications },
+        timeline: session.hudTimeline,
+      });
+      queueMicrotask(() => {
+        try {
+          void Promise.resolve(this.hudObserver?.publish(snapshot)).catch(() => undefined);
+        } catch {
+          // Observer failures must never affect cognition.
+        }
+      });
+    } catch {
+      // HUD telemetry must never affect cognition.
+    }
+  }
+}
+
+function hudDecision(decision: ReturnType<CognitivePolicy["evaluate"]>["decision"]): AthenaHudSnapshot["decision"] {
+  return decision === "GO" ? "ALLOW" : decision === "BLOCK" ? "DENY" : decision === "VERIFY" ? "ASK" : "REPLAN";
+}
+
+function hudReason(decision: ReturnType<CognitivePolicy["evaluate"]>["decision"]): string {
+  return decision === "GO" ? "Action allowed" : decision === "BLOCK" ? "Action blocked" : decision === "VERIFY" ? "Verification required" : "Deliberation required";
+}
+
+function hudState(value: number): "CLEAR" | "WATCH" | "ALERT" {
+  return value >= 0.75 ? "ALERT" : value >= 0.4 ? "WATCH" : "CLEAR";
+}
+
+function hudSystem1(assessment?: System1Snapshot["assessment"]): AthenaHudSnapshot["system1"] {
+  if (!assessment) return { state: "UNKNOWN", confidence: 0 };
+  const risk = Math.max(assessment.safety.failureProbability, assessment.safety.policyViolationProbability, assessment.progress.stagnationProbability, assessment.epistemics.contradictionProbability);
+  return { state: hudState(risk), confidence: 1 - assessment.epistemics.stateUncertainty };
+}
+
+function hudAegis(assessment?: System1Snapshot["assessment"]): AthenaHudSnapshot["aegis"] {
+  if (!assessment) return { state: "UNKNOWN", confidence: 0 };
+  return { state: hudState(Math.max(assessment.safety.failureProbability, assessment.safety.policyViolationProbability, assessment.safety.impactSeverity, assessment.safety.irreversibility)), confidence: 1 - assessment.safety.failureProbability };
+}
+
+function hudMetis(assessment?: System1Snapshot["assessment"]): AthenaHudSnapshot["metis"] {
+  if (!assessment) return { state: "UNKNOWN", confidence: 0 };
+  return { state: hudState(Math.max(1 - assessment.progress.progressProbability, assessment.progress.stagnationProbability)), confidence: assessment.progress.goalAlignment };
+}
+
+function hudNike(assessment?: System1Snapshot["assessment"]): AthenaHudSnapshot["nike"] {
+  if (!assessment) return { state: "UNKNOWN", confidence: 0 };
+  return { state: hudState(Math.max(1 - assessment.completion.evidenceCoverage, assessment.completion.unresolvedObligationsProbability)), confidence: assessment.completion.evidenceCoverage };
+}
+
+function hudEpistemics(assessment?: System1Snapshot["assessment"]): AthenaHudSnapshot["epistemics"] {
+  if (!assessment) return { state: "UNKNOWN", confidence: 0 };
+  const risk = Math.max(assessment.epistemics.stateUncertainty, assessment.epistemics.contradictionProbability);
+  return { state: assessment.epistemics.contradictionProbability >= 0.75 ? "CONFLICTED" : risk >= 0.4 ? "MIXED" : "GROUNDED", confidence: assessment.epistemics.contextSufficiency };
 }
 
 export function getCognitiveSessionCounters(runtime: CognitiveRuntime, sessionID: string): CognitiveSessionCounters { return runtime.counters(sessionID); }

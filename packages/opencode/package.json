@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@athena/core": "workspace:*",
+    "@athena/hud-protocol": "workspace:*",
     "@athena/typesafe": "workspace:*",
     "@opencode/plugin": "2.0.7"
   },

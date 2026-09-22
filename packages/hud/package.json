@@ -1,0 +1,11 @@
+{
+  "name": "@athena/hud",
+  "version": "0.1.0",
+  "type": "module",
+  "license": "MIT",
+  "repository": "https://github.com/athena-jev/athena-jev",
+  "files": ["dist"],
+  "bin": { "athena-hud": "./dist/sidecar.js" },
+  "scripts": { "build": "tsc -p tsconfig.json", "typecheck": "tsc -p tsconfig.json" },
+  "dependencies": { "@athena/hud-protocol": "workspace:*" }
+}

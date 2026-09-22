@@ -71,11 +71,26 @@ importers:
         specifier: workspace:*
         version: link:../typesafe
 
+  packages/hud:
+    dependencies:
+      '@athena/hud-protocol':
+        specifier: workspace:*
+        version: link:../hud-protocol
+
+  packages/hud-protocol:
+    dependencies:
+      zod:
+        specifier: ^3.24.0
+        version: 3.25.76
+
   packages/opencode:
     dependencies:
       '@athena/core':
         specifier: workspace:*
         version: link:../core
+      '@athena/hud-protocol':
+        specifier: workspace:*
+        version: link:../hud-protocol
       '@athena/typesafe':
         specifier: workspace:*
         version: link:../typesafe
