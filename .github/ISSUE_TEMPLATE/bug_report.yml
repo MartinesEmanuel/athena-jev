@@ -1,0 +1,53 @@
+name: Bug report
+description: Report reproducible ATHENA behavior
+title: "bug: "
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: ATHENA version or commit
+    validations:
+      required: true
+  - type: input
+    id: host
+    attributes:
+      label: Host
+      placeholder: OpenCode, Codex, or another adapter
+    validations:
+      required: true
+  - type: input
+    id: host-version
+    attributes:
+      label: Host version
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node version
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs or trace
+      description: Remove API keys, tokens, prompts, and private repository content.
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction
+    validations:
+      required: true

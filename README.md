@@ -1,101 +1,144 @@
 # ATHENA
 
-## Give coding agents reflexes.
+Give coding agents reflexes.
 
-ATHENA is an independent open-source reflex and control layer for coding agents powered by TypeSafe Jev. It observes actions and results, applies deterministic safety rules, asks Jev for compact semantic judgment when needed, and lets ATHENA policy decide control.
+ATHENA is an independent open-source cognitive control layer for coding agents powered by TypeSafe Jev.
 
 ```text
+System 2 / LLM
+      |
+Candidate action
+      |
+ATHENA System 1
+      |
+TypeSafe Jev
+      |
+AEGIS / METIS / NIKE / EPISTEMICS
+      |
+CognitivePolicy
+      |
+GO / DELIBERATE / VERIFY / BLOCK
+      |
+Tools or System-2 reconsideration
+```
+
 LLM thinks. Jev judges. ATHENA controls. Tools execute.
-```
 
-```text
-                    ATHENA CORE
-          Rules + Jev + Policy + State
-                         |
-                 Agent Adapter SDK
-                         |
-              +----------+----------+
-              |                     |
-          OpenCode                Codex
-           V1 / V2
-```
+## Cognitive domains
 
-## Why?
+- **AEGIS**: risk and safety.
+- **METIS**: progress, information gain, and stagnation.
+- **NIKE**: completion, evidence, and unresolved obligations.
+- **EPISTEMICS**: uncertainty, context sufficiency, and contradiction.
 
-Coding agents can repeat failed strategies, take unnecessary risks, or claim completion without enough evidence. ATHENA adds a fast System One control layer around observable agent behavior.
+Jev returns bounded, typed judgments. Deterministic `CognitivePolicy` remains control authority. Jev never executes tools.
 
-## Reflexes
+## Decisions
 
-- **AEGIS:** risk reflex. Deterministic rules handle known catastrophic actions; Jev evaluates ambiguous risk.
-- **METIS:** progress, stagnation, and semantic-loop reflex. Detects repeated underlying strategies, not only repeated strings.
-- **NIKE:** completion reflex. Evaluates whether completion evidence is sufficient where adapter hooks permit observation.
+- **GO**: allow current action.
+- **DELIBERATE**: stop current action and ask System 2 to reconsider its strategy.
+- **VERIFY**: require evidence before proceeding or claiming completion.
+- **BLOCK**: prevent unsafe action.
 
-Jev produces semantic judgment. ATHENA policy remains control authority. Jev never executes tools.
+## Quick start
 
-## Supported Agents
+Requirements:
 
-| Runtime | AEGIS | METIS | REPLAN | Live validated |
-| --- | --- | --- | --- | --- |
-| OpenCode V1 `1.18.31` | yes | yes | system context | yes |
-| OpenCode V2 `2.0.7` plugin API | yes | yes | context hook | yes |
-| OpenAI Codex CLI `0.154.0` | yes | yes | privileged developer/tool context | yes |
-
-**Experimental:** Cursor adapter code remains isolated for research. Cursor adapter is experimental and is not part of ATHENA v0.1 verified support. Claude Code is planned.
-
-## Quick Start
-
-Requirements: Node 20+, pnpm, and `TYPESAFE_API_KEY` for real Jev.
+- Node.js 20 or later
+- pnpm 10 or later
+- `TYPESAFE_API_KEY` for real Jev judgments
+- OpenCode for OpenCode integration
 
 ```bash
-pnpm install
+git clone https://github.com/MartinesEmanuel/athena-jev.git
+cd athena-jev
+pnpm install --frozen-lockfile
 pnpm build
 export TYPESAFE_API_KEY="..."
-
-# OpenCode
-node packages/cli/dist/index.js init
-node packages/cli/dist/index.js doctor
-
-# Codex
-node packages/cli/dist/index.js init codex
-node packages/cli/dist/index.js doctor codex
+pnpm athena
 ```
 
-Do not commit `TYPESAFE_API_KEY`. Full setup: [quickstart](docs/quickstart.md).
+`pnpm athena` starts OpenCode with ATHENA cognitive runtime and HUD launcher. `pnpm athena:opencode` starts same launcher without tmux orchestration. Run `pnpm hud` separately for HUD only.
 
-## Demo
+Offline validation needs no provider key:
 
-Run `node packages/cli/dist/index.js demo` for deterministic offline output. The `controlled-semantic-loop` evaluation fixture repeats a failing test with superficial variations; METIS can request REPLAN, then asks agent to reassess root cause rather than prescribe a fix.
+```bash
+pnpm test
+```
 
-## Architecture And Security
+See [quickstart](docs/quickstart.md) for CLI setup details.
+
+## HUD
+
+HUD is optional local observability.
+
+```bash
+pnpm hud
+pnpm athena
+```
+
+```text
+CognitiveRuntime
+      |
+redacted AthenaHudSnapshot
+      |
+local Unix socket
+      |
+standalone HUD
+```
+
+Snapshots are push-based and local only. HUD does not poll. HUD failures never break cognition. ATHENA sends no prompts, provider responses, or reasoning to HUD. When `tmux` is available, `pnpm athena` can open side-by-side HUD; tmux is optional.
+
+## Host support
+
+| Host | Status |
+| --- | --- |
+| OpenCode 1.18.31 | Live tested. V1 plugin integration. |
+| OpenCode 2.0.7 | Adapter present and covered by offline tests; less live validation than 1.18.31. |
+| Codex | Experimental adapter package. Not production-tested for this release. |
+| Cursor | Experimental research adapter. Not public CLI support. |
+
+OpenCode does not expose supported interception of final textual completion. Completion enforcement is strongest around exposed tool actions.
+
+## Project status
+
+- Current stage: early experimental open-source release.
+- Core architecture: working.
+- Real Jev: working.
+- OpenCode live integration: working for 1.18.31.
+- HUD: working.
+- Performance benefit: under evaluation.
+
+## Repository structure
+
+- `packages/core`: provider-independent cognitive contracts, policy, and reducer.
+- `packages/typesafe`: TypeSafe Jev System-1 and standalone System-2 bridge.
+- `packages/opencode`: OpenCode integration and runtime.
+- `packages/hud`: standalone cognitive HUD.
+- `packages/hud-protocol`: redacted HUD snapshot contract.
+- `packages/agent-sdk`: host-independent adapter contracts.
+- `packages/codex`: experimental Codex adapter.
+- `packages/cursor`: experimental Cursor adapter.
+- `packages/cli`: ATHENA CLI.
+
+## Current limitations
+
+- Jev adds network latency to each cognitive cycle.
+- HUD is a standalone sidecar, not a native host sidebar.
+- Host validation is strongest for OpenCode 1.18.31.
+- ATHENA makes no claim of universal agent performance improvement.
+
+## Documentation
 
 - [Architecture](docs/architecture.md)
 - [Adapters](docs/adapters.md)
 - [Security model](docs/security-model.md)
-- [Replan lifecycle](docs/reflexes.md)
-- [Evaluation](docs/evaluation.md)
-
-ATHENA persists redacted local JSONL telemetry under `.athena/events.jsonl`. Tool input, tool output, repository content, and MCP output are untrusted. Read security model before using ATHENA for consequential work.
-
-## Benchmarks
-
-Live adapter proofs and constructed calibration evidence exist. Large comparative benchmarks are next research phase. ATHENA publishes no ATHENA-versus-baseline improvement claims yet. See [benchmarks](docs/benchmarks.md).
-
-## Contributing
-
-Read [CONTRIBUTING.md](CONTRIBUTING.md). New adapters need capability declarations, normalization, compliance tests, canonical telemetry, no synthetic user control messages, and live proof when runtime permits it.
-
-## Roadmap
-
-- Comparative benchmark suite and ablation studies
-- Cross-model evaluation
-- `athena watch`
-- Adaptive reflex budgets
-- Additional adapters
-- Claude Code adapter
+- [Contributing](CONTRIBUTING.md)
+- [Roadmap](docs/roadmap.md)
 
 ## Independence
 
-ATHENA is independent open-source software built using TypeSafe Jev. It is not an official TypeSafe product and does not imply TypeSafe endorsement, partnership, employment, or affiliation.
+ATHENA is independent open-source software. TypeSafe Jev is a dependency/service used by ATHENA. ATHENA is not an official TypeSafe or OpenCode product and does not imply endorsement, partnership, employment, or affiliation.
 
 ## License
 

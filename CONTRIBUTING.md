@@ -1,13 +1,20 @@
 # Contributing
 
-Use Node 20+ and pnpm.
+Use Node 20+ and pnpm 10+.
 
 ```bash
-pnpm install
-pnpm check
+pnpm install --frozen-lockfile
+pnpm lint
+pnpm typecheck
+pnpm test
+pnpm build
 ```
 
-Keep changes focused. Add tests for behavior changes. Preserve deterministic safety protections, frozen v0.1 METIS behavior, and local-first privacy. Discuss new agent adapters or policy changes in an issue before broad implementation.
+Keep changes focused. Add offline tests for behavior changes. Live provider tests are opt-in: `ATHENA_LIVE_TEST=1 pnpm test:live` requires a locally supplied key and must not run in normal CI.
+
+Never commit provider keys. Do not store chain-of-thought. Do not inject ATHENA control as a synthetic user message.
+
+`@athena/core` must remain provider-independent. Provider SDK imports belong outside core. Policy decisions belong in ATHENA deterministic code; Jev supplies bounded semantic judgment and never executes tools.
 
 ## Adapter Contributions
 

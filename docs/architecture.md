@@ -1,49 +1,46 @@
 # Architecture
 
-```text
-                    ATHENA CORE
-          Rules + Jev + Policy + State
-                         |
-                 Agent Adapter SDK
-                         |
-              +----------+----------+
-              |                     |
-          OpenCode                Codex
-           V1 / V2
-```
+ATHENA uses System 1 and System 2 as an architectural metaphor, not a literal neuroscience claim. System 2 is host coding-agent deliberation. ATHENA System 1 evaluates candidate actions before execution.
 
 ```text
-Coding agent
-     |
-actions and results
-     v
-ATHENA
-     |
-AEGIS / METIS / NIKE
-     |
-Jev semantic judgment
-     |
-ATHENA policy
-     |
-ALLOW / DENY / REPLAN
-     |
-agent continues
+System 2 / host agent
+        |
+candidate tool action
+        |
+ATHENA cognitive runtime
+        |
+WorldState -> Jev primitive judgments -> CognitivePolicy
+        |
+GO / DELIBERATE / VERIFY / BLOCK
 ```
 
-Core owns deterministic rules, policy, session state, replan lifecycle, redacted event storage, and normalization helpers. `@athena/typesafe` implements Jev providers. `@athena/agent-sdk` owns cross-runtime contracts. Adapters translate only their host runtime.
+## WorldState and System 1
 
-Jev never controls tools directly. It returns typed semantic judgment. ATHENA policy decides control.
+`CognitiveWorldState` contains bounded goal, candidate action, current observation, recent actions, recent strategies, unresolved obligations, and environment constraints. Tool input, output, repository content, and host context are untrusted evidence. ATHENA normalizes and redacts these inputs before persistence or provider calls.
 
-## State And Replan
+TypeSafe Jev provides typed primitive judgments in four domains:
 
-ATHENA observes only exposed data: goals, tool calls, results, errors, changed files, validation status, and bounded recent history. It does not inspect hidden reasoning.
+- **AEGIS**: failure risk, impact, irreversibility, policy violation.
+- **METIS**: progress, information gain, novelty, stagnation, alignment.
+- **NIKE**: goal satisfaction, evidence coverage, unresolved obligations.
+- **EPISTEMICS**: uncertainty, context sufficiency, contradiction.
 
-Replan lifecycle: `detected`, `queued`, `injected`, `observing`, `resolved`. The next meaningful action is compared by semantic strategy family, not command-string inequality. Outcome is `changed`, `ignored`, or `unclear`.
+## Policy and state
 
-## Stable v0.1 Behavior
+`CognitivePolicy` combines deterministic rules with typed System-1 assessment. Deterministic code remains authoritative for known danger. Jev does not execute tools or make final control decisions.
 
-METIS thresholds and policy behavior are frozen for comparative benchmark work. Calibration artifacts are constructed evidence, not large statistical benchmarks. See [METIS calibration](metis-calibration.md).
+`transitionCognitiveState` is a deterministic reducer for candidate, assessment, decision, tool result, verification, and deliberation events. It tracks temporal cognitive state without storing hidden model reasoning.
 
-## Security
+## Tool and deliberation lifecycles
 
-Read [security model](security-model.md). Core receives untrusted inputs, redacts before persistence/provider calls, and keeps deterministic catastrophic rules independent from Jev availability.
+Before a host executes a tool, ATHENA builds WorldState, requests System-1 assessment, and applies policy. `GO` permits execution. `BLOCK` rejects execution. `DELIBERATE` stops current action, queues host System-2 context, and evaluates subsequent action again. `VERIFY` requires evidence before work continues or completion is claimed.
+
+After host reports a tool result, ATHENA records bounded redacted observation and updates state. Every later candidate re-enters System 1.
+
+## HUD observability
+
+`CognitiveRuntime` emits redacted `AthenaHudSnapshot` records to an optional local Unix socket. HUD receives push updates only. It receives no prompts, provider responses, or reasoning. HUD observer failures are isolated from cognition.
+
+## Provider and host boundaries
+
+`@athena/core` contains provider-independent contracts, policy, reducer, and redacted event store. `@athena/typesafe` owns Jev and standalone System-2 provider integrations. `@athena/agent-sdk` owns host-independent adapter contracts. Host packages translate native hooks only; they do not place host schemas in core.

@@ -1,15 +1,16 @@
 # Quickstart
 
-## Requirements
+## Prerequisites
 
 - Node 20 or later
 - pnpm 10 or later
-- `TYPESAFE_API_KEY` for real Jev judgments
+- `TYPESAFE_API_KEY` for real TypeSafe Jev judgments
+- OpenCode for OpenCode integration
 
 Clone repository, then install and build:
 
 ```bash
-pnpm install
+pnpm install --frozen-lockfile
 pnpm build
 ```
 
@@ -28,16 +29,32 @@ node packages/cli/dist/index.js doctor
 
 ## OpenCode
 
-Install project plugin and inspect diagnostics:
+Launch ATHENA with OpenCode and optional HUD:
+
+```bash
+pnpm athena
+```
+
+`pnpm athena` builds required packages, starts OpenCode with ATHENA runtime, and uses tmux for a side-by-side HUD when available. Without tmux, OpenCode still starts and launcher prints optional standalone HUD command.
+
+The CLI package also supports project plugin setup:
 
 ```bash
 node packages/cli/dist/index.js init
 node packages/cli/dist/index.js doctor
 ```
 
-`init` detects installed OpenCode major version and creates `.opencode/plugins/athena.ts`. OpenCode V1 uses `experimental.chat.system.transform`; V2 uses its context hook.
+`init` detects installed OpenCode major version and creates `.opencode/plugins/athena.ts`. OpenCode 1.18.31 is live tested. OpenCode 2.0.7 integration is covered by offline tests but has less live validation.
 
-## Codex
+## Standalone HUD
+
+```bash
+pnpm hud
+```
+
+HUD listens on a local Unix socket. Set `ATHENA_HUD_SOCKET` only when a custom socket path is required.
+
+## Experimental Codex adapter
 
 Merge native Codex hooks without replacing existing handlers:
 
@@ -46,7 +63,7 @@ node packages/cli/dist/index.js init codex
 node packages/cli/dist/index.js doctor codex
 ```
 
-Codex invokes ATHENA hooks through its configured command handlers. Replan enters Codex developer/tool context, never a user message.
+Codex adapter exists but is not production-tested for this release. Replan enters Codex developer/tool context, never a user message.
 
 ## Modes And Local Inspection
 
@@ -68,3 +85,5 @@ pnpm test
 pnpm build
 ATHENA_LIVE_TEST=1 pnpm test:live
 ```
+
+`test:live` makes network calls and is opt-in. Standalone System-2 probes use `ATHENA_SYSTEM2_*` variables or `OPENAI_API_KEY` and `OPENAI_MODEL`; normal OpenCode use does not require them.
