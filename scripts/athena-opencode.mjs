@@ -41,8 +41,8 @@ function startHud() {
     pane.on("exit", (code) => { if (code !== 0) fallbackSidecar = startDetachedHud(); });
     return pane;
   }
-  console.error(`[ATHENA launcher] tmux unavailable. HUD: node ${hud} --socket ${socketPath}`);
-  return startDetachedHud();
+  console.error(`[ATHENA launcher] tmux unavailable. In another terminal: node ${hud} --socket ${socketPath}`);
+  return undefined;
 }
 
 function startDetachedHud() {
@@ -64,7 +64,7 @@ async function waitForSocket() {
 }
 
 const sidecar = startHud();
-await waitForSocket();
+if (sidecar) await waitForSocket();
 
 console.error("[ATHENA launcher] plugin:", plugin);
 console.error("[ATHENA launcher] args:", JSON.stringify(args));
