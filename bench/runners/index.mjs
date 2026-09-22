@@ -85,8 +85,8 @@ function logicalPath(value, context) {
   const workdirRoot = context?.workdirRoot;
   let output = String(value);
   output = output.replaceAll(repoRoot, "$REPO");
-  output = output.replaceAll(homeRoot, "$HOME");
   if (workdirRoot) output = output.replaceAll(workdirRoot, "$WORKDIR");
+  output = output.replaceAll(homeRoot, "$HOME");
   return output;
 }
 export function redact(value, context) {
