@@ -575,7 +575,7 @@ describe("restored runner regressions", () => {
   }, 5_000);
 
   it("redacts secrets, authorization headers, and contextual paths", () => {
-    const value = redact('token=top-secret Authorization: Bearer abc.def /tmp/bench/work/file /home/martins/Documents/athena-jev/a', { workdirRoot: "/tmp/bench/work" });
+    const value = redact(`token=top-secret Authorization: Bearer abc.def /tmp/bench/work/file ${join(process.cwd(), "a")}`, { workdirRoot: "/tmp/bench/work" });
     expect(value).not.toContain("top-secret");
     expect(value).not.toContain("abc.def");
     expect(value).toContain("$WORKDIR");
