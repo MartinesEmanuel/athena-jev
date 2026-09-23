@@ -125,9 +125,11 @@ export const athenaUiJevSchema = z.object({
 }).strict();
 export const athenaUiToolRouterSchema = z.object({
   visible: z.number().int().min(0).max(10_000),
+  selected: z.number().int().min(0).max(10_000),
   total: z.number().int().min(0).max(10_000),
   mode: z.enum(["ROUTED", "FULL", "OBSERVE"]),
 }).strict();
+export const athenaUiEnforcementModeSchema = z.enum(["observe", "enforce"]);
 
 export const athenaUiSessionSchema = z.object({
   cycles: z.number().int().min(0).max(1_000_000),
@@ -153,6 +155,7 @@ export const athenaUiSnapshotSchema = z.object({
   epistemics: athenaUiEpistemicsSchema.optional(),
   jev: athenaUiJevSchema.optional(),
   toolRouter: athenaUiToolRouterSchema.optional(),
+  enforcementMode: athenaUiEnforcementModeSchema.optional(),
   session: athenaUiSessionSchema.optional(),
   lastDecision: athenaUiLastDecisionSchema.optional(),
   timeline: z.array(athenaUiPhaseSchema).max(16),
@@ -167,6 +170,7 @@ export type AthenaUiEpistemics = z.infer<typeof athenaUiEpistemicsSchema>;
 export type AthenaUiSession = z.infer<typeof athenaUiSessionSchema>;
 export type AthenaUiJev = z.infer<typeof athenaUiJevSchema>;
 export type AthenaUiToolRouter = z.infer<typeof athenaUiToolRouterSchema>;
+export type AthenaUiEnforcementMode = z.infer<typeof athenaUiEnforcementModeSchema>;
 export type AthenaUiDecision = z.infer<typeof athenaUiDecisionValueSchema>;
 
 /** Cognitive state symbols. Presentation only; snapshot values stay stable machine codes. */

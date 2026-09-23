@@ -17,6 +17,7 @@ export function athenaCredentialPaths(env: NodeJS.ProcessEnv = process.env): str
   if (env.ATHENA_CREDENTIALS) paths.push(env.ATHENA_CREDENTIALS);
   const home = env.HOME || homedir();
   if (env.XDG_CONFIG_HOME) paths.push(join(env.XDG_CONFIG_HOME, "athena", "credentials"));
+  else if (home) paths.push(join(home, ".config", "athena", "credentials"));
   if (home) paths.push(join(home, ".athena", "credentials"));
   return paths;
 }

@@ -26,7 +26,7 @@ describe("ATHENA-owned credentials", () => {
       join("/xdg", "athena", "credentials"),
       join("/home/u", ".athena", "credentials"),
     ]);
-    expect(athenaCredentialPaths({ HOME: "/home/u" })).toEqual([join("/home/u", ".athena", "credentials")]);
+    expect(athenaCredentialPaths({ HOME: "/home/u" })).toEqual([join("/home/u", ".config", "athena", "credentials"), join("/home/u", ".athena", "credentials")]);
   });
 
   it("loads the key into env without ever returning the secret", () => {

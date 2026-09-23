@@ -1,4 +1,4 @@
-import { CognitivePolicy, assessStrategyShift, buildCognitiveWorldState, buildDeliberationRequest, initialCognitiveState, normalizeText, policyResultToDecisionEvent, policyResultToEvidenceEvent, renderDeliberationContext, transitionCognitiveState, type CognitiveState, type StrategyFrame, type System1Snapshot } from "@athena/core";
+import { CognitivePolicy, assessStrategyShift, buildCognitiveWorldState, buildDeliberationRequest, initialCognitiveState, normalizeText, policyResultToDecisionEvent, policyResultToEvidenceEvent, renderDeliberationContext, transitionCognitiveState, type AthenaEnforcementMode, type CognitiveState, type StrategyFrame, type System1Snapshot } from "@athena/core";
 import { createAthenaHudSnapshot, type AthenaHudObserver, type AthenaHudSnapshot, type AthenaHudTimelineEvent } from "@athena/hud-protocol";
 import { athenaSessionRef, buildAthenaUiSnapshot, uiDecision, type AthenaUiCounters, type AthenaUiDecisionNote, type AthenaUiObserver } from "./ui-snapshot.js";
 
@@ -64,6 +64,7 @@ interface RuntimeSession {
   hudTimeline: AthenaHudTimelineEvent[];
   lastUiDecision: AthenaUiDecisionNote | null;
   lastUiAssessment?: System1Snapshot["assessment"];
+  lastPolicyDecision: ReturnType<CognitivePolicy["evaluate"]>["decision"] | null;
 }
 
 function emptyCounters(): CognitiveSessionCounters {
@@ -99,12 +100,16 @@ export class CognitiveRuntime {
     private readonly policy = new CognitivePolicy(),
     private readonly hudObserver?: AthenaHudObserver,
     private readonly uiObserver?: AthenaUiObserver,
+    private readonly enforcementMode: AthenaEnforcementMode = "enforce",
   ) {}
 
   capturePrompt(sessionID: string, prompt: unknown): void {
     const session = this.session(sessionID);
     const goal = promptText(prompt);
     if (goal !== "no details") session.goal = goal;
+    // Give a newly opened TUI a real, non-model-backed initial projection.
+    // This is presentation only: no Jev call, policy evaluation, or tool gate.
+    this.publishHud(sessionID, session, "ACTION", "GO", "NONE", "Task observed");
     trace("prompt", { sessionID, goalCaptured: session.goal !== "OpenCode task" });
   }
 
@@ -140,20 +145,24 @@ export class CognitiveRuntime {
     session.counters = { ...session.counters, candidates: session.counters.candidates + 1, assessments: session.counters.assessments + 1, jevRequests: session.counters.jevRequests + (telemetry?.requestCount ?? 0), jevQuestions: session.counters.jevQuestions + (telemetry?.questionCount ?? 0), jevTotalLatencyMs: session.counters.jevTotalLatencyMs + (telemetry?.latencyMs ?? 0), worldStateChars: session.counters.worldStateChars + worldStateChars };
     this.apply(session, { type: "ASSESSMENT_COMPLETED", candidateId, assessment: snapshot.assessment, timestamp: new Date().toISOString(), sessionId: sessionID });
     const result = this.policy.evaluate(snapshot.assessment, session.state, snapshot.worldState);
+    session.lastPolicyDecision = result.decision;
     this.apply(session, policyResultToEvidenceEvent(result, candidateId, new Date().toISOString(), sessionID));
-    this.apply(session, policyResultToDecisionEvent(result, snapshot.assessment, candidateId, new Date().toISOString(), sessionID));
+    // Observe preserves the honest policy result above while using GO solely as
+    // a lifecycle authorization so the host call can continue unimpeded.
+    const effectiveResult = this.enforcementMode === "observe" && result.decision !== "GO" ? { ...result, decision: "GO" as const } : result;
+    this.apply(session, policyResultToDecisionEvent(effectiveResult, snapshot.assessment, candidateId, new Date().toISOString(), sessionID));
     // Decision counters move before the DECISION snapshot so an observer never
     // sees a decision whose own tally is still stale.
     if (result.decision === "GO") session.counters = { ...session.counters, allowed: session.counters.allowed + 1 };
     if (result.decision === "BLOCK") session.counters = { ...session.counters, blocked: session.counters.blocked + 1 };
     if (result.decision === "DELIBERATE") session.counters = { ...session.counters, deliberations: session.counters.deliberations + 1, interventions: session.counters.interventions + 1 };
     if (result.decision === "VERIFY") session.counters = { ...session.counters, verifications: session.counters.verifications + 1, interventions: session.counters.interventions + 1 };
-    this.publishHud(sessionID, session, "DECISION", result.decision, hudDecision(result.decision), hudReason(result.decision), snapshot.assessment);
+    this.publishHud(sessionID, session, "DECISION", result.decision, hudDecision(result.decision), this.enforcementMode === "observe" && result.decision !== "GO" ? `Would ${result.decision.toLowerCase()}` : hudReason(result.decision), snapshot.assessment);
     trace("cycle", { sessionID, cycle: session.counters.assessments, worldChars: worldStateChars, evidence: world.recentActions.length + (world.currentObservation ? 1 : 0), untrustedEvidence: world.recentActions.filter((item) => item.provenance.trust === "UNTRUSTED").length + (world.currentObservation?.provenance.trust === "UNTRUSTED" ? 1 : 0), jevRequests: telemetry?.requestCount ?? 0, jevQuestions: telemetry?.questionCount ?? 0, jevLatencyMs: telemetry?.latencyMs ?? 0, decision: result.decision, failure: snapshot.assessment.safety.failureProbability, impactSeverity: snapshot.assessment.safety.impactSeverity, irreversibility: snapshot.assessment.safety.irreversibility, policyViolation: snapshot.assessment.safety.policyViolationProbability, progress: snapshot.assessment.progress.progressProbability, informationGain: snapshot.assessment.progress.informationGainProbability, novelty: snapshot.assessment.progress.strategyNovelty, stagnation: snapshot.assessment.progress.stagnationProbability, goalAlignment: snapshot.assessment.progress.goalAlignment, goalSatisfied: snapshot.assessment.completion.goalSatisfiedProbability, evidenceCoverage: snapshot.assessment.completion.evidenceCoverage, unresolved: snapshot.assessment.completion.unresolvedObligationsProbability, uncertainty: snapshot.assessment.epistemics.stateUncertainty, contextSufficiency: snapshot.assessment.epistemics.contextSufficiency, contradiction: snapshot.assessment.epistemics.contradictionProbability });
 
-    if (result.decision === "GO") {
+    if (this.enforcementMode === "observe" || result.decision === "GO") {
       this.apply(session, { type: "ACTION_ALLOWED", candidateId, timestamp: new Date().toISOString(), sessionId: sessionID });
-      this.publishHud(sessionID, session, "ACTION", "GO", "ALLOW", "Action allowed", snapshot.assessment);
+      this.publishHud(sessionID, session, "ACTION", "GO", "ALLOW", this.enforcementMode === "observe" && result.decision !== "GO" ? `Would ${result.decision.toLowerCase()}; action observed` : "Action allowed", snapshot.assessment);
       return result;
     }
     if (result.decision === "BLOCK") {
@@ -209,13 +218,13 @@ export class CognitiveRuntime {
 
   summary(sessionID: string): CognitiveSessionSummary {
     const session = this.session(sessionID);
-    return { sessionID, ...session.counters, phase: session.state.phase, goalCaptured: session.goal !== "OpenCode task", pendingContext: session.pendingContext?.decision ?? null, lastDecision: session.state.lastDecision, jevAverageLatencyMs: session.counters.jevRequests === 0 ? 0 : Math.round(session.counters.jevTotalLatencyMs / session.counters.jevRequests), worldStateAverageChars: session.counters.assessments === 0 ? 0 : Math.round(session.counters.worldStateChars / session.counters.assessments), tokens: "unavailable" };
+    return { sessionID, ...session.counters, phase: session.state.phase, goalCaptured: session.goal !== "OpenCode task", pendingContext: session.pendingContext?.decision ?? null, lastDecision: session.lastPolicyDecision, jevAverageLatencyMs: session.counters.jevRequests === 0 ? 0 : Math.round(session.counters.jevTotalLatencyMs / session.counters.jevRequests), worldStateAverageChars: session.counters.assessments === 0 ? 0 : Math.round(session.counters.worldStateChars / session.counters.assessments), tokens: "unavailable" };
   }
 
   private session(sessionID: string): RuntimeSession {
     let session = this.sessions.get(sessionID);
     if (!session) {
-      session = { goal: "OpenCode task", state: initialCognitiveState(), events: [], recentActions: [], recentStrategies: [], observation: null, pendingContext: null, awaitingStrategy: null, counters: emptyCounters(), hudTimeline: [], lastUiDecision: null };
+      session = { goal: "OpenCode task", state: initialCognitiveState(), events: [], recentActions: [], recentStrategies: [], observation: null, pendingContext: null, awaitingStrategy: null, counters: emptyCounters(), hudTimeline: [], lastUiDecision: null, lastPolicyDecision: null };
       this.sessions.set(sessionID, session);
     }
     return session;
@@ -290,6 +299,7 @@ export class CognitiveRuntime {
         strategyShifts: session.counters.meaningfulStrategyShifts,
         jevRequests: session.counters.jevRequests,
         jevLatencyMs: session.counters.jevRequests === 0 ? 0 : Math.round(session.counters.jevTotalLatencyMs / session.counters.jevRequests),
+        enforcementMode: this.enforcementMode,
       };
       const lastDecision = session.lastUiDecision ?? undefined;
       queueMicrotask(() => {

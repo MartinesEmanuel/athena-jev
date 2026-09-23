@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import type { CognitiveAssessment } from "@athena/core";
+import type { AthenaEnforcementMode, CognitiveAssessment } from "@athena/core";
 import { createAthenaUiSnapshot, type AthenaHudSnapshot, type AthenaUiAegis, type AthenaUiDecision, type AthenaUiEpistemics, type AthenaUiMetis, type AthenaUiNike, type AthenaUiPhase, type AthenaUiSnapshot } from "@athena/hud-protocol";
 
 /**
@@ -22,6 +22,7 @@ export interface AthenaUiCounters {
   readonly strategyShifts: number;
   readonly jevRequests: number;
   readonly jevLatencyMs?: number;
+  readonly enforcementMode?: AthenaEnforcementMode;
 }
 
 export interface AthenaUiDecisionNote {
@@ -129,6 +130,7 @@ export function buildAthenaUiSnapshot(input: AthenaUiInput): AthenaUiSnapshot {
       strategyShifts: counters.strategyShifts,
     },
     ...(decision ? { lastDecision: decision } : {}),
+    ...(counters.enforcementMode ? { enforcementMode: counters.enforcementMode } : {}),
     timeline: hud.timeline.map((event) => phaseOf(event.status)),
   });
 }

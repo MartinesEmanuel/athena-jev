@@ -58,7 +58,7 @@ export const AthenaPlugin = Plugin.define({
 
     // Sanitized UI snapshots: cache for the seed fetch, fan out over RPC.
     const uiSnapshots = new Map<string, AthenaUiSnapshot>();
-    const routerStatuses = new Map<string, { visible: number; total: number; mode: "ROUTED" | "FULL" | "OBSERVE" }>();
+    const routerStatuses = new Map<string, { visible: number; selected: number; total: number; mode: "ROUTED" | "FULL" | "OBSERVE" }>();
     let emitSnapshot: ((snapshot: AthenaUiSnapshot) => Promise<void>) | undefined;
     const uiObserver: AthenaUiObserver = {
       publish(value) {
@@ -74,7 +74,7 @@ export const AthenaPlugin = Plugin.define({
       },
     };
 
-    const cognitive = new CognitiveRuntime(createTypeSafeSystem1(), undefined, createHudSocketObserver(), uiObserver);
+    const cognitive = new CognitiveRuntime(createTypeSafeSystem1(), undefined, createHudSocketObserver(), uiObserver, config.enforcementMode);
     // The official V2 `session.context` hook is immediately before primary model
     // inference and exposes a mutable tool map. Router errors are always swallowed.
     let toolRouter: ToolRouter | undefined;
@@ -254,7 +254,7 @@ export const AthenaPlugin = Plugin.define({
         const hostTools = event.tools as Record<string, { description?: string; input?: unknown }>;
         const state = openCodeRoutingState(cognitive.routingContext(event.sessionID), hostTools);
         const decision = await toolRouter.route(state, describeOpenCodeTools(hostTools));
-        routerStatuses.set(athenaSessionRef(event.sessionID), { visible: decision.stats.exposedTools, total: decision.stats.totalTools, mode: config.toolRouter.mode === "observe" ? "OBSERVE" : decision.mode });
+        routerStatuses.set(athenaSessionRef(event.sessionID), { visible: config.toolRouter.mode === "observe" ? decision.stats.totalTools : decision.stats.exposedTools, selected: decision.stats.exposedTools, total: decision.stats.totalTools, mode: config.toolRouter.mode === "observe" ? "OBSERVE" : decision.mode });
         // Observe retains the original tool map. Active removes only a policy-selected subset.
         if (config.toolRouter.mode === "active" && decision.mode === "ROUTED") event.tools = selectOpenCodeTools(event.tools, decision.selectedToolIds);
       } catch {

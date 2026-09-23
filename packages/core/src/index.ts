@@ -51,6 +51,7 @@ export * from "./tool-routing/index.js";
 
 export type AthenaDecision = "allow" | "ask" | "deny" | "replan";
 export type AthenaMode = "shadow" | "guardian" | "balanced";
+export type AthenaEnforcementMode = "observe" | "enforce";
 export type ReflexKind = "risk" | "progress" | "stagnation" | "completion";
 export type Probability = number;
 export interface Action { id: string; tool: string; input: string; readOnly?: boolean; timestamp: string }
@@ -67,6 +68,7 @@ export interface ReflexProvider { name: "typesafe" | "demo"; evaluateRisk(state:
 export interface ReflexState { goal: string; proposedAction?: { tool: string; intent: string; category: string }; action?: Action; result?: { success: boolean; summary: string; errors: string[] }; recentActions: Array<{ tool: string; intent: string; category: string; strategy: string; success?: boolean; resultSummary?: string; errorFamily?: string }>; changedFiles: string[]; currentErrors: string[]; repeatedErrors: string[]; buildStatus: "passed" | "failed" | "unknown"; testStatus: "passed" | "failed" | "unknown" }
 export const configSchema = z.object({
   mode: z.enum(["shadow", "guardian", "balanced"]).default("shadow"), provider: z.enum(["typesafe", "demo"]).default("typesafe"),
+  enforcementMode: z.enum(["observe", "enforce"]).default("observe"),
   reflexes: z.object({ risk: z.boolean().default(true), progress: z.boolean().default(true), stagnation: z.boolean().default(true), completion: z.boolean().default(true) }).default({}),
   thresholds: z.object({ riskAsk: z.number().min(0).max(1).default(0.8), riskDeny: z.number().min(0).max(1).default(0.95), stagnation: z.number().min(0).max(1).default(0.75), replan: z.number().min(0).max(1).default(0.9), completionContinue: z.number().min(0).max(1).default(0.85) }).default({}),
   telemetry: z.object({ persist: z.boolean().default(true) }).default({}),

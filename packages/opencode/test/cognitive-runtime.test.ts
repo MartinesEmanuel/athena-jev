@@ -24,6 +24,36 @@ function fake(value: CognitiveAssessment): System1Runtime & { calls: number } {
 }
 
 describe("CognitiveRuntime", () => {
+  it("observe enforcement permits GO, BLOCK, VERIFY, and DELIBERATE candidates", async () => {
+    const go = assessment();
+    const block = assessment({ safety: { failureProbability: 0.1, impactSeverity: 0.1, irreversibility: 0.1, policyViolationProbability: 0.99 } });
+    const verify = assessment({ completion: { goalSatisfiedProbability: 0.9, evidenceCoverage: 0.1, unresolvedObligationsProbability: 0.9 } });
+    const deliberate = assessment({ progress: { progressProbability: 0.1, informationGainProbability: 0.1, strategyNovelty: 0.1, stagnationProbability: 0.9, goalAlignment: 0.9 } });
+    const values = [go, block, verify, deliberate, deliberate, deliberate];
+    const system1: System1Runtime = { async assess(world) { return { worldState: world, assessment: values.shift() ?? deliberate, assessmentSchemaVersion: "1", observerVersions: { aegis: "1", metis: "1", nike: "1", epistemic: "1" } }; } };
+    const runtime = new CognitiveRuntime(system1, undefined, undefined, undefined, "observe");
+    for (const id of ["go", "block", "verify", "one", "two", "deliberate"]) {
+      await expect(runtime.before("observe", id, "bash", { command: "work" })).resolves.toBeDefined();
+      runtime.after("observe", id, "bash", "completed", "observed");
+    }
+    expect(runtime.summary("observe").lastDecision).toBe("DELIBERATE");
+    expect(runtime.summary("observe").phase).toBe("READY");
+  });
+
+  it("enforce retains authoritative BLOCK behavior", async () => {
+    const system1 = fake(assessment({ safety: { failureProbability: 0.1, impactSeverity: 0.1, irreversibility: 0.1, policyViolationProbability: 0.99 } }));
+    const runtime = new CognitiveRuntime(system1, undefined, undefined, undefined, "enforce");
+    await expect(runtime.before("enforce", "blocked", "bash", {})).rejects.toThrow("ATHENA blocked bash");
+  });
+
+  it("observe UI preserves the raw BLOCK decision as observational", async () => {
+    const ui: AthenaUiSnapshot[] = [];
+    const system1 = fake(assessment({ safety: { failureProbability: 0.1, impactSeverity: 0.1, irreversibility: 0.1, policyViolationProbability: 0.99 } }));
+    const runtime = new CognitiveRuntime(system1, undefined, undefined, { publish: (snapshot) => { ui.push(snapshot); } }, "observe");
+    await expect(runtime.before("observe-ui", "blocked", "bash", {})).resolves.toMatchObject({ decision: "BLOCK" });
+    await new Promise<void>((resolve) => { setTimeout(resolve, 0); });
+    expect(ui.some((snapshot) => snapshot.lastDecision?.decision === "BLOCK" && snapshot.enforcementMode === "observe")).toBe(true);
+  });
   it("publishes redacted, bounded HUD snapshots without waiting for observer", async () => {
     const snapshots: AthenaHudSnapshot[] = [];
     let release: (() => void) | undefined;

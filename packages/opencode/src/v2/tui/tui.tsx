@@ -2,13 +2,12 @@ import { Plugin } from "@opencode/plugin/tui";
 import { createSignal } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import type { RGBA } from "@opentui/core";
-import { athenaUiPhaseSymbol, type AthenaUiDecision, type AthenaUiJev, type AthenaUiPhase, type AthenaUiSession, type AthenaUiSnapshot, type AthenaUiToolRouter } from "@athena/hud-protocol";
+import { athenaUiPhaseSymbol, type AthenaUiJev, type AthenaUiPhase, type AthenaUiSession, type AthenaUiSnapshot, type AthenaUiToolRouter } from "@athena/hud-protocol";
 import { athenaRpc } from "../../shared/rpc.js";
 
-/** ATHENA gold. Used for identity and non-alarming phases only. */
-const ACCENT = "#d9a441";
-/** ATHENA red. Reserved for BLOCK, DEGRADED and DANGER-class states. */
-const DANGER = "#c25b52";
+/** White + blue only: quiet, readable, and non-interruptive. */
+const ACCENT = "#4f8cff";
+const BRIGHT = "#f7f9ff";
 const SEED_ATTEMPTS = 5;
 const SEED_BASE_DELAY_MS = 250;
 const TIMELINE_SHOWN = 12;
@@ -20,8 +19,6 @@ const EMPTY_SESSION: AthenaUiSession = { cycles: 0, deliberations: 0, verificati
 const EMPTY_JEV: AthenaUiJev = { requests: 0 };
 const EMPTY_ROUTER: AthenaUiToolRouter | undefined = undefined;
 
-const DANGER_VALUES = new Set(["DANGER", "STAGNATING", "NEEDS_EVIDENCE", "CONTRADICTORY"]);
-const WATCH_VALUES = new Set(["CAUTION", "EXPLORING", "UNCERTAIN"]);
 
 /**
  * Only these three transitions may interrupt the operator.
@@ -47,25 +44,26 @@ function domainRow(label: string, value?: string): string {
 
 function valueColor(value: string | undefined, subdued: Color): Color {
   if (!value) return subdued;
-  if (DANGER_VALUES.has(value)) return DANGER;
-  if (WATCH_VALUES.has(value)) return ACCENT;
-  return subdued;
+  return BRIGHT;
 }
 
-function phaseColor(phase: AthenaUiPhase): Color {
-  return phase === "BLOCK" || phase === "DEGRADED" ? DANGER : ACCENT;
-}
+function phaseColor(phase: AthenaUiPhase): Color { void phase; return ACCENT; }
 
 function shiftRow(visible: boolean) {
   return visible ? <text fg={ACCENT}>{"  ↳ STRATEGY SHIFT"}</text> : null;
 }
 
-function decisionRow(decision: AthenaUiDecision | undefined, subdued: Color) {
+function decisionRow(decision: string | undefined, subdued: Color) {
   return decision ? <text fg={subdued}>{`last          ${decision}`}</text> : null;
 }
 
 function noticeRow(notice: string | null) {
-  return notice ? <text fg={DANGER}>{notice}</text> : null;
+  return notice ? <text fg={BRIGHT}>{notice}</text> : null;
+}
+
+function decisionLabel(current: AthenaUiSnapshot): string | undefined {
+  const decision = current.lastDecision?.decision;
+  return decision && current.enforcementMode === "observe" && decision !== "GO" ? `WOULD ${decision}` : decision;
 }
 
 export default Plugin.define({
@@ -220,7 +218,7 @@ export default Plugin.define({
               return (
                 <box flexDirection="column" paddingX={1} width="100%">
                   <text fg={ACCENT}>{"ATHENA"}</text>
-                  <text fg={subdued}>{"◌ waiting"}</text>
+                  <text fg={ACCENT}>{"● READY"}</text>
                 </box>
               );
             }
@@ -230,18 +228,22 @@ export default Plugin.define({
             return (
               <box flexDirection="column" paddingX={1} width="100%">
                 <text fg={ACCENT}>{"ATHENA"}</text>
-                <text fg={phaseColor(current.phase)}>{`${symbol(current.phase)} ${current.phase}`}</text>
-                <text fg={valueColor(current.aegis, subdued)}>{domainRow("AEGIS", current.aegis)}</text>
-                <text fg={valueColor(current.metis, subdued)}>{domainRow("METIS", current.metis)}</text>
+                <text fg={ACCENT}>{`${symbol(current.phase)} ${decisionLabel(current) ?? current.phase}`}</text>
+                <text fg={subdued}>{""}</text>
+                <text fg={BRIGHT}>{domainRow("AEGIS", current.aegis)}</text>
+                <text fg={BRIGHT}>{domainRow("METIS", current.metis)}</text>
                 {shiftRow(shiftVisible())}
-                <text fg={valueColor(current.nike, subdued)}>{domainRow("NIKE", current.nike)}</text>
-                <text fg={valueColor(current.epistemics, subdued)}>{domainRow("EPISTEMICS", current.epistemics)}</text>
+                <text fg={BRIGHT}>{domainRow("NIKE", current.nike)}</text>
+                <text fg={BRIGHT}>{domainRow("EPISTEMICS", current.epistemics)}</text>
+                {current.enforcementMode ? <text fg={subdued}>{`MODE       ${current.enforcementMode.toUpperCase()}`}</text> : null}
                 <text fg={subdued}>
                   {`cycles ${counters.cycles} · delib ${counters.deliberations} · ver ${counters.verifications} · block ${counters.blocks}`}
                 </text>
                 <text fg={subdued}>{`jev ${jev.requests}${jev.latencyMs === undefined ? "" : ` · ${jev.latencyMs}ms`}`}</text>
-                {router ? <text fg={subdued}>{`tools ${router.visible}/${router.total} · ${router.mode}`}</text> : null}
-                {decisionRow(current.lastDecision?.decision, subdued)}
+                {router ? <text fg={ACCENT}>{`TOOLS      ${router.selected}/${router.total} · ${router.mode}`}</text> : null}
+                <text fg={subdued}>{`CYCLES     ${counters.cycles}`}</text>
+                <text fg={subdued}>{`JEV        ${jev.latencyMs === undefined ? "—" : `${jev.latencyMs} ms`}`}</text>
+                {decisionLabel(current) ? <text fg={BRIGHT}>{`LAST       ${decisionLabel(current)}`}</text> : null}
               </box>
             );
           },
@@ -265,7 +267,7 @@ export default Plugin.define({
             const label = mode();
             return (
               <text fg={phaseColor(current.phase)}>
-                {`ATHENA ${symbol(current.phase)} ${current.phase}${label ? ` · ${label.toUpperCase()}` : ""}`}
+                {`ATHENA  ${symbol(current.phase)} ${decisionLabel(current) ?? current.phase}${label ? ` · ${label.toUpperCase()}` : ""}`}
               </text>
             );
           },
@@ -298,7 +300,7 @@ export default Plugin.define({
               return (
                 <box flexDirection="column" paddingX={2} paddingY={1}>
                   <text fg={ACCENT}>{"ATHENA"}</text>
-                  <text fg={subdued}>{"◌ waiting for the cognitive runtime"}</text>
+                  <text fg={subdued}>{"● ready for task observation"}</text>
                 </box>
               );
             }
@@ -327,11 +329,11 @@ export default Plugin.define({
                 <text fg={subdued}>{`jev calls     ${jev.requests}`}</text>
                 <text fg={subdued}>{`jev latency   ${jev.latencyMs === undefined ? "—" : `${jev.latencyMs}ms`}`}</text>
                 <text fg={subdued}>{`mode          ${(label ?? "—").toUpperCase()}`}</text>
-                {router ? <><text>{" "}</text><text fg={ACCENT}>{"TOOL ROUTER"}</text><text fg={subdued}>{`visible       ${router.visible} / ${router.total}`}</text><text fg={subdued}>{`mode          ${router.mode}`}</text></> : null}
+                {router ? <><text>{" "}</text><text fg={ACCENT}>{"TOOL ROUTER"}</text><text fg={subdued}>{`mode          ${router.mode}`}</text><text fg={subdued}>{`visible       ${router.visible}`}</text><text fg={subdued}>{`selected      ${router.selected}`}</text><text fg={subdued}>{`total         ${router.total}`}</text></> : null}
                 <text>{" "}</text>
                 <text fg={subdued}>{"timeline"}</text>
                 <text fg={ACCENT}>{shown.map((phase) => symbol(phase)).join(" ")}</text>
-                {decisionRow(current.lastDecision?.decision, subdued)}
+                {decisionRow(decisionLabel(current), subdued)}
                 {current.lastDecision?.shortReason ? <text fg={subdued}>{`             ${current.lastDecision.shortReason}`}</text> : null}
                 {noticeRow(notice())}
               </box>

@@ -6,4 +6,6 @@ It is separate from Cognitive Control: the router minimizes what the model sees 
 
 `toolRouter.mode` defaults to `observe`. `off` makes no router calls, `observe` records the predicted subset without changing host tools, and `active` applies the deterministic allowlist. It reports structural tool-count reduction only, not token savings.
 
+ATHENA cognitive enforcement separately defaults to `enforcementMode: "observe"`: Jev assessments and GO/DELIBERATE/VERIFY/BLOCK results remain visible and measured, but OpenCode calls continue. Set `enforcementMode: "enforce"` to restore authoritative intervention behavior.
+
 OpenCode V2 uses the official mutable `session.context` hook. V1 is preserved unchanged because its compatible API does not provide an equivalent safe pre-model mutable tool context.

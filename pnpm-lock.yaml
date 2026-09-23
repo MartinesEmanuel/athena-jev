@@ -37,6 +37,9 @@ importers:
       '@athena/core':
         specifier: workspace:*
         version: link:../core
+      '@athena/opencode':
+        specifier: workspace:*
+        version: link:../opencode
       '@athena/typesafe':
         specifier: workspace:*
         version: link:../typesafe
