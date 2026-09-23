@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { Plugin } from "@opencode/plugin";
-import { EventStore, loadConfig, saveConfig, stagnationScore, type Action, type AthenaConfig, type PendingReplan, type ReplanState, type StagnationReflex } from "@athena/core";
-import { createTypeSafeSystem1, DemoReflexProvider } from "@athena/typesafe";
+import { EventStore, ToolRouter, loadConfig, saveConfig, stagnationScore, type Action, type AthenaConfig, type PendingReplan, type ReplanState, type StagnationReflex } from "@athena/core";
+import { createTypeSafeSystem1, DemoReflexProvider, TypeSafeToolRoutingJudge } from "@athena/typesafe";
 import { parseAthenaUiSnapshot, type AthenaUiSnapshot } from "@athena/hud-protocol";
 import { athenaRpc } from "../../shared/rpc.js";
 import { CognitiveRuntime } from "../../shared/cognitive-runtime.js";
@@ -10,6 +10,7 @@ import { createHudSocketObserver } from "../../shared/hud-observer.js";
 import { athenaSessionRef, type AthenaUiObserver } from "../../shared/ui-snapshot.js";
 import { loadAthenaCredentials } from "../../shared/credentials.js";
 import { athenaModeNotice, parseAthenaMode } from "../../shared/commands.js";
+import { describeOpenCodeTools, openCodeRoutingState, selectOpenCodeTools } from "../../shared/tool-routing-adapter.js";
 
 /** Bounded cache so a long-lived host cannot grow UI snapshots without limit. */
 const MAX_CACHED_SNAPSHOTS = 32;
@@ -57,11 +58,13 @@ export const AthenaPlugin = Plugin.define({
 
     // Sanitized UI snapshots: cache for the seed fetch, fan out over RPC.
     const uiSnapshots = new Map<string, AthenaUiSnapshot>();
+    const routerStatuses = new Map<string, { visible: number; total: number; mode: "ROUTED" | "FULL" | "OBSERVE" }>();
     let emitSnapshot: ((snapshot: AthenaUiSnapshot) => Promise<void>) | undefined;
     const uiObserver: AthenaUiObserver = {
       publish(value) {
         // Contract validation: anything off-contract never reaches the TUI.
-        const snapshot = parseAthenaUiSnapshot(value);
+        const priorRouter = routerStatuses.get(value.sessionRef);
+        const snapshot = parseAthenaUiSnapshot(priorRouter ? { ...value, toolRouter: priorRouter } : value);
         if (uiSnapshots.size >= MAX_CACHED_SNAPSHOTS && !uiSnapshots.has(snapshot.sessionRef)) {
           const oldest = uiSnapshots.keys().next().value;
           if (oldest !== undefined) uiSnapshots.delete(oldest);
@@ -72,6 +75,17 @@ export const AthenaPlugin = Plugin.define({
     };
 
     const cognitive = new CognitiveRuntime(createTypeSafeSystem1(), undefined, createHudSocketObserver(), uiObserver);
+    // The official V2 `session.context` hook is immediately before primary model
+    // inference and exposes a mutable tool map. Router errors are always swallowed.
+    let toolRouter: ToolRouter | undefined;
+    if (config.toolRouter.mode !== "off") {
+      try {
+        toolRouter = new ToolRouter(new TypeSafeToolRoutingJudge(), config.toolRouter.mode);
+      } catch {
+        // Credentials/provider setup is optional for this optimization. Existing
+        // inference and cognitive control continue with the full tool set.
+      }
+    }
 
     // Register RPC
     const rpcReg = await ctx.rpc.register(athenaRpc, {
@@ -235,6 +249,17 @@ export const AthenaPlugin = Plugin.define({
     const contextHook = await ctx.session.hook("context", async (event) => {
       const cognitiveContext = cognitive.injectContext(event.sessionID);
       if (cognitiveContext) event.system.push({ type: "text", text: cognitiveContext });
+      if (!toolRouter || event.tools === undefined) return;
+      try {
+        const hostTools = event.tools as Record<string, { description?: string; input?: unknown }>;
+        const state = openCodeRoutingState(cognitive.routingContext(event.sessionID), hostTools);
+        const decision = await toolRouter.route(state, describeOpenCodeTools(hostTools));
+        routerStatuses.set(athenaSessionRef(event.sessionID), { visible: decision.stats.exposedTools, total: decision.stats.totalTools, mode: config.toolRouter.mode === "observe" ? "OBSERVE" : decision.mode });
+        // Observe retains the original tool map. Active removes only a policy-selected subset.
+        if (config.toolRouter.mode === "active" && decision.mode === "ROUTED") event.tools = selectOpenCodeTools(event.tools, decision.selectedToolIds);
+      } catch {
+        // Fail open: leave the original host tool map untouched.
+      }
     });
 
     return () => {
@@ -247,6 +272,7 @@ export const AthenaPlugin = Plugin.define({
       pendingActions.clear();
       pendingReplans.clear();
       uiSnapshots.clear();
+      routerStatuses.clear();
       emitSnapshot = undefined;
     };
   },

@@ -201,6 +201,12 @@ export class CognitiveRuntime {
 
   counters(sessionID: string): CognitiveSessionCounters { return { ...this.session(sessionID).counters }; }
 
+  /** Redacted bounded routing input, separate from cognitive action decisions. */
+  routingContext(sessionID: string): { goal: string; recentObservationSummary?: string; currentStrategy?: string; phase: string } {
+    const session = this.session(sessionID);
+    return { goal: session.goal, ...(session.observation ? { recentObservationSummary: session.observation.summary } : {}), ...(session.recentStrategies.at(-1) ? { currentStrategy: session.recentStrategies.at(-1)!.approach } : {}), phase: session.state.phase };
+  }
+
   summary(sessionID: string): CognitiveSessionSummary {
     const session = this.session(sessionID);
     return { sessionID, ...session.counters, phase: session.state.phase, goalCaptured: session.goal !== "OpenCode task", pendingContext: session.pendingContext?.decision ?? null, lastDecision: session.state.lastDecision, jevAverageLatencyMs: session.counters.jevRequests === 0 ? 0 : Math.round(session.counters.jevTotalLatencyMs / session.counters.jevRequests), worldStateAverageChars: session.counters.assessments === 0 ? 0 : Math.round(session.counters.worldStateChars / session.counters.assessments), tokens: "unavailable" };

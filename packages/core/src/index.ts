@@ -47,6 +47,7 @@ export {
   buildDeliberationRequest,
   assessStrategyShift,
 } from "./cognition/index.js";
+export * from "./tool-routing/index.js";
 
 export type AthenaDecision = "allow" | "ask" | "deny" | "replan";
 export type AthenaMode = "shadow" | "guardian" | "balanced";
@@ -69,6 +70,7 @@ export const configSchema = z.object({
   reflexes: z.object({ risk: z.boolean().default(true), progress: z.boolean().default(true), stagnation: z.boolean().default(true), completion: z.boolean().default(true) }).default({}),
   thresholds: z.object({ riskAsk: z.number().min(0).max(1).default(0.8), riskDeny: z.number().min(0).max(1).default(0.95), stagnation: z.number().min(0).max(1).default(0.75), replan: z.number().min(0).max(1).default(0.9), completionContinue: z.number().min(0).max(1).default(0.85) }).default({}),
   telemetry: z.object({ persist: z.boolean().default(true) }).default({}),
+  toolRouter: z.object({ mode: z.enum(["off", "observe", "active"]).default("observe") }).default({}),
   budgets: z.object({ maxJevCallsPerSession: z.number().int().min(1).max(1000).default(100), minMeaningfulActionsBetweenStagnationChecks: z.number().int().min(1).max(20).default(2), replanCooldownMeaningfulActions: z.number().int().min(1).max(50).default(3) }).default({})
 });
 export type AthenaConfig = z.infer<typeof configSchema>;

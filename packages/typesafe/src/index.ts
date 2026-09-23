@@ -96,3 +96,4 @@ export class DemoReflexProvider implements ReflexProvider {
 }
 
 export { type System2ModelConfig, type System2Fetch, type System2FetchResponse, System2ProviderError, system2ModelConfigFromEnvironment, OpenAICompatibleSystem2Bridge } from "./system2.js";
+export { TypeSafeToolRoutingJudge } from "./tool-routing.js";

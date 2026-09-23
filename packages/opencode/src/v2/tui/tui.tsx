@@ -2,7 +2,7 @@ import { Plugin } from "@opencode/plugin/tui";
 import { createSignal } from "solid-js";
 import { useKeyboard } from "@opentui/solid";
 import type { RGBA } from "@opentui/core";
-import { athenaUiPhaseSymbol, type AthenaUiDecision, type AthenaUiJev, type AthenaUiPhase, type AthenaUiSession, type AthenaUiSnapshot } from "@athena/hud-protocol";
+import { athenaUiPhaseSymbol, type AthenaUiDecision, type AthenaUiJev, type AthenaUiPhase, type AthenaUiSession, type AthenaUiSnapshot, type AthenaUiToolRouter } from "@athena/hud-protocol";
 import { athenaRpc } from "../../shared/rpc.js";
 
 /** ATHENA gold. Used for identity and non-alarming phases only. */
@@ -18,6 +18,7 @@ type StatusResponse = { mode: string };
 
 const EMPTY_SESSION: AthenaUiSession = { cycles: 0, deliberations: 0, verifications: 0, blocks: 0, strategyShifts: 0 };
 const EMPTY_JEV: AthenaUiJev = { requests: 0 };
+const EMPTY_ROUTER: AthenaUiToolRouter | undefined = undefined;
 
 const DANGER_VALUES = new Set(["DANGER", "STAGNATING", "NEEDS_EVIDENCE", "CONTRADICTORY"]);
 const WATCH_VALUES = new Set(["CAUTION", "EXPLORING", "UNCERTAIN"]);
@@ -225,6 +226,7 @@ export default Plugin.define({
             }
             const counters = current.session ?? EMPTY_SESSION;
             const jev = current.jev ?? EMPTY_JEV;
+            const router = current.toolRouter ?? EMPTY_ROUTER;
             return (
               <box flexDirection="column" paddingX={1} width="100%">
                 <text fg={ACCENT}>{"ATHENA"}</text>
@@ -238,6 +240,7 @@ export default Plugin.define({
                   {`cycles ${counters.cycles} · delib ${counters.deliberations} · ver ${counters.verifications} · block ${counters.blocks}`}
                 </text>
                 <text fg={subdued}>{`jev ${jev.requests}${jev.latencyMs === undefined ? "" : ` · ${jev.latencyMs}ms`}`}</text>
+                {router ? <text fg={subdued}>{`tools ${router.visible}/${router.total} · ${router.mode}`}</text> : null}
                 {decisionRow(current.lastDecision?.decision, subdued)}
               </box>
             );
@@ -301,6 +304,7 @@ export default Plugin.define({
             }
             const counters = current.session ?? EMPTY_SESSION;
             const jev = current.jev ?? EMPTY_JEV;
+            const router = current.toolRouter ?? EMPTY_ROUTER;
             const shown = current.timeline.slice(-TIMELINE_SHOWN);
             const label = mode();
             return (
@@ -323,6 +327,7 @@ export default Plugin.define({
                 <text fg={subdued}>{`jev calls     ${jev.requests}`}</text>
                 <text fg={subdued}>{`jev latency   ${jev.latencyMs === undefined ? "—" : `${jev.latencyMs}ms`}`}</text>
                 <text fg={subdued}>{`mode          ${(label ?? "—").toUpperCase()}`}</text>
+                {router ? <><text>{" "}</text><text fg={ACCENT}>{"TOOL ROUTER"}</text><text fg={subdued}>{`visible       ${router.visible} / ${router.total}`}</text><text fg={subdued}>{`mode          ${router.mode}`}</text></> : null}
                 <text>{" "}</text>
                 <text fg={subdued}>{"timeline"}</text>
                 <text fg={ACCENT}>{shown.map((phase) => symbol(phase)).join(" ")}</text>
