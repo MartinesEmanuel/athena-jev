@@ -23,7 +23,7 @@ export class TypeSafeToolRoutingJudge implements ToolRoutingJudge {
     this.client = client ?? new TypeSafeClient({ timeout });
   }
   async judge(state: ToolRoutingState, families: readonly ToolFamily[]): Promise<Partial<Record<ToolFamily, number>>> {
-    const questions = Object.fromEntries(families.map((family) => [family, noul(`Is ${family} capability useful for making progress on the next immediate step? Answer only from the compact task state; this is capability routing, not an action decision.`)]));
+    const questions = Object.fromEntries(families.map((family) => [family, noul(`Is access to ${family} necessary or strongly relevant before the agent can make reliable progress on its current next meaningful objective? Do not select it merely because it could become useful in a later task step. Preserve it when the compact state makes its relevance genuinely uncertain. This is capability routing, not an action decision.`)]));
     const rawTypedOutput = await this.client.systemOne({ state: JSON.stringify({ kind: "athena-tool-routing", state }), questions });
     this.latestRawTypedOutput = rawTypedOutput;
     return parse(rawTypedOutput, families);

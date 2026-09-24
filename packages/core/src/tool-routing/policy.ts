@@ -22,7 +22,7 @@ export function routeToolFamilies(state: ToolRoutingState, tools: readonly ToolD
   }
   for (const family of taskProtectedFamilies([state.goal, state.currentIntent, ...(state.unresolvedObligations ?? [])].filter(Boolean).join(" "))) families.add(family);
   if (families.has("EDIT")) families.add("INSPECT");
-  if (state.phase === "VERIFY" || (state.unresolvedObligations ?? []).some((item) => /test|verify|build|lint/i.test(item))) families.add("EXECUTE");
+  if (state.phase === "VERIFY" || (state.unresolvedObligations ?? []).some((item) => /\b(test|tests|verify|verification|validate|validation|build|lint)\b/i.test(item))) families.add("EXECUTE");
   // Unknown and external/custom integrations have insufficient semantics to prune safely.
   for (const tool of tools) if (tool.family === "OTHER" || tool.external) families.add(tool.family);
   const selected = tools.filter((tool) => families.has(tool.family)).map((tool) => tool.id);

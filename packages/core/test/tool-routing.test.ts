@@ -15,6 +15,10 @@ describe("tool routing policy", () => {
   });
   it("retains inspect/edit for a change", () => expect(routeToolFamilies(state("Change timeout from 5s to 10s."), tools, scores(["EDIT"])).selectedFamilies).toEqual(expect.arrayContaining(["INSPECT", "EDIT"])));
   it("retains execute for failing tests and verify", () => expect(routeToolFamilies(state("Tests are failing after the last edit.", { phase: "VERIFY" }), tools, scores(["EXECUTE"])).selectedFamilies).toEqual(expect.arrayContaining(["INSPECT", "EXECUTE"])));
+  it("does not equate inspection with search and recognizes verification word forms", () => {
+    expect(routeToolFamilies(state("Inspect the bounded configuration value."), tools, scores([])).selectedFamilies).not.toContain("SEARCH");
+    expect(routeToolFamilies(state("State current progress.", { obligations: ["Record required verification"] }), tools, scores([])).selectedFamilies).toContain("EXECUTE");
+  });
   it("retains web research and explicit external capability", () => {
     expect(routeToolFamilies(state("Check current OpenCode plugin documentation."), tools, scores(["WEB"])).selectedFamilies).toContain("WEB");
     expect(routeToolFamilies(state("Use the MCP external integration."), tools, scores([])).selectedFamilies).toContain("EXTERNAL");
