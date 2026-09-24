@@ -28,6 +28,30 @@ describe("TypeSafe System-1 runtime", () => {
     expect(new CognitivePolicy().evaluate(snapshot.assessment, initialCognitiveState(), snapshot.worldState).decision).toBeDefined();
   });
 
+  it("keeps standalone AEGIS intensities as scores and separates evidence uncertainty from execution risk", async () => {
+    const mock = client();
+    const runtime = createTypeSafeSystem1(100, mock as never);
+    const assessment = await runtime.judges.aegis.judge({ goal: world().goal, candidate: world().candidate, currentObservation: world().currentObservation, environment: world().environment, recentFailures: [] });
+    expect(Object.values(mock.received ?? {}).filter((question) => (question as { type?: string }).type === "noul")).toHaveLength(2);
+    expect(Object.values(mock.received ?? {}).filter((question) => (question as { type?: string }).type === "score")).toHaveLength(2);
+    expect((mock.received?.failureProbability as { instructions: string }).instructions).toContain("destructiveness");
+    expect((mock.received?.policyViolationProbability as { instructions: string }).instructions).toContain("specific stated goal or environment constraint");
+    expect(assessment).toEqual({ failureProbability: 0.2, impactSeverity: 2 / 3, irreversibility: 2 / 3, policyViolationProbability: 0.2 });
+  });
+
+  it("regresses historical AEGIS evidence and hard-fact conflations at the question boundary", async () => {
+    const mock = client();
+    const runtime = createTypeSafeSystem1(100, mock as never);
+    await runtime.assess(world());
+    const failure = (mock.received?.failureProbability as { instructions: string }).instructions;
+    const policy = (mock.received?.policyViolationProbability as { instructions: string }).instructions;
+    expect(failure).toContain("completion answer"); // premature completion and weak-evidence claims
+    expect(failure).toContain("untrusted/inferred/proposed evidence"); // provenance and proposed-vs-observed
+    expect(failure).toContain("destructiveness"); // deterministic destructive facts are not semantic failure
+    expect(policy).toContain("explicitly makes the action disallowed"); // policy requires an actual stated constraint
+    expect(policy).toContain("failed prior action"); // repeated failure is not automatically a policy violation
+  });
+
   it("rejects unexpected provider answer fields", async () => {
     const runtime = createTypeSafeSystem1(100, client(true) as never);
     await expect(runtime.assess(world())).rejects.toMatchObject({ name: "TypeSafeSystem1Error", kind: "INVALID_RESPONSE" } satisfies Partial<TypeSafeSystem1Error>);
@@ -41,7 +65,7 @@ describe("TypeSafe System-1 runtime", () => {
   it("surfaces typed provider failures without a fake fallback", async () => {
     const broken = { systemOne: async () => { throw new Error("network unavailable"); } };
     const runtime = createTypeSafeSystem1(100, broken as never);
-    await expect(runtime.judges.aegis.judge({ candidate: world().candidate, currentObservation: world().currentObservation, environment: world().environment, recentFailures: [] })).rejects.toMatchObject({ name: "TypeSafeSystem1Error", kind: "TRANSPORT" } satisfies Partial<TypeSafeSystem1Error>);
+    await expect(runtime.judges.aegis.judge({ goal: world().goal, candidate: world().candidate, currentObservation: world().currentObservation, environment: world().environment, recentFailures: [] })).rejects.toMatchObject({ name: "TypeSafeSystem1Error", kind: "TRANSPORT" } satisfies Partial<TypeSafeSystem1Error>);
     await expect(runtime.assess(world())).rejects.toMatchObject({ name: "TypeSafeSystem1Error", kind: "TRANSPORT" } satisfies Partial<TypeSafeSystem1Error>);
   });
 

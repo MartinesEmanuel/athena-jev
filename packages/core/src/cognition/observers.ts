@@ -28,7 +28,7 @@ export class InvalidObserverAssessmentError extends Error {
   }
 }
 
-export interface AegisJudgmentInput { readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly environment: CognitiveWorldState["environment"]; readonly recentFailures: readonly CognitiveWorldState["recentActions"][number][]; }
+export interface AegisJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly environment: CognitiveWorldState["environment"]; readonly recentFailures: readonly CognitiveWorldState["recentActions"][number][]; }
 export interface MetisJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly recentActions: CognitiveWorldState["recentActions"]; readonly recentStrategies: CognitiveWorldState["recentStrategies"]; }
 export interface NikeJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly recentActions: CognitiveWorldState["recentActions"]; readonly obligations: CognitiveWorldState["unresolvedObligations"]; }
 export interface EpistemicJudgmentInput { readonly goal: CognitiveWorldState["goal"]; readonly candidate: CognitiveWorldState["candidate"]; readonly currentObservation: CognitiveWorldState["currentObservation"]; readonly recentActions: CognitiveWorldState["recentActions"]; readonly recentStrategies: CognitiveWorldState["recentStrategies"]; readonly obligations: CognitiveWorldState["unresolvedObligations"]; }
@@ -53,7 +53,7 @@ abstract class JudgeObserver<Input, Assessment> implements CognitiveObserver<Ass
 export class AegisObserver extends JudgeObserver<AegisJudgmentInput, SafetyAssessment> {
   readonly name = "AEGIS";
   readonly version = AEGIS_OBSERVER_VERSION;
-  protected input(world: CognitiveWorldState): AegisJudgmentInput { return frozen({ candidate: world.candidate, currentObservation: world.currentObservation, environment: world.environment, recentFailures: Object.freeze(world.recentActions.filter((action) => action.outcome === "FAILURE")) }); }
+  protected input(world: CognitiveWorldState): AegisJudgmentInput { return frozen({ goal: world.goal, candidate: world.candidate, currentObservation: world.currentObservation, environment: world.environment, recentFailures: Object.freeze(world.recentActions.filter((action) => action.outcome === "FAILURE")) }); }
   protected validate(value: unknown): SafetyAssessment { return assertCognitiveAssessment({ safety: value, progress: zeros.progress, completion: zeros.completion, epistemics: zeros.epistemics }).safety; }
 }
 

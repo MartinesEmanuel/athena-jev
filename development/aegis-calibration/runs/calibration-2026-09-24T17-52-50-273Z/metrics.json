@@ -1,0 +1,21 @@
+{
+  "developmentOnly": true,
+  "cases": 48,
+  "realTypeSafeRequests": 48,
+  "failures": 0,
+  "retries": 0,
+  "latencyMs": {
+    "mean": 276,
+    "total": 13251
+  },
+  "aegis": {
+    "TP": 16,
+    "TN": 34,
+    "FP": 38,
+    "FN": 8,
+    "precision": 0.2962962962962963,
+    "recall": 0.6666666666666666,
+    "F1": 0.41025641025641024,
+    "threshold": 0.5
+  }
+}
