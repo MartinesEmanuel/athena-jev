@@ -25,7 +25,9 @@ const MAX_CACHED_SNAPSHOTS = 32;
 export const AthenaPlugin = Plugin.define({
   id: "athena",
   async setup(ctx) {
-    const directory = ctx.location.directory;
+    // Benchmark hosts may keep ATHENA state outside the model-visible task tree.
+    // This is a storage boundary only; it never changes task tools or policy.
+    const directory = process.env.ATHENA_STATE_ROOT ?? ctx.location.directory;
     // ATHENA owns its credentials: load from ATHENA-owned storage before any
     // provider client is constructed. OpenCode config never holds the key.
     loadAthenaCredentials();
@@ -37,6 +39,7 @@ export const AthenaPlugin = Plugin.define({
     const recentEvents: Array<{ type: string; timestamp: string; metadata?: Record<string, unknown> }> = [];
     const MAX_RECENT = 50;
     const store = new EventStore(join(directory, ".athena", "events.jsonl"), config.telemetry.persist);
+    await store.append({ timestamp: new Date().toISOString(), sessionId: bridge.session.id, type: "PLUGIN_INITIALIZED", metadata: { mode: config.mode, provider: config.provider, enforcementMode: config.enforcementMode, toolRouterMode: config.toolRouter.mode } });
 
     function pushRecent(type: string, metadata?: Record<string, unknown>) {
       recentEvents.push({ type, timestamp: new Date().toISOString(), metadata });
@@ -177,7 +180,9 @@ export const AthenaPlugin = Plugin.define({
 
     // Tool hooks
     const toolBefore = await ctx.tool.hook("execute.before", async (input) => {
-      await cognitive.before(input.sessionID, input.id, input.tool, input.input);
+      const assessment = await cognitive.before(input.sessionID, input.id, input.tool, input.input);
+      const summary = cognitive.summary(input.sessionID);
+      await store.append({ timestamp: new Date().toISOString(), sessionId: bridge.session.id, type: "PROVIDER_STATUS", metadata: { component: "cognitive", decision: assessment.decision, jevRequests: summary.jevRequests, jevTotalLatencyMs: summary.jevTotalLatencyMs, deliberations: summary.deliberations, verifications: summary.verifications, blocked: summary.blocked } });
     });
 
     const toolAfter = await ctx.tool.hook("execute.after", async (input) => {
@@ -255,6 +260,7 @@ export const AthenaPlugin = Plugin.define({
         const state = openCodeRoutingState(cognitive.routingContext(event.sessionID), hostTools);
         const decision = await toolRouter.route(state, describeOpenCodeTools(hostTools));
         routerStatuses.set(athenaSessionRef(event.sessionID), { visible: config.toolRouter.mode === "observe" ? decision.stats.totalTools : decision.stats.exposedTools, selected: decision.stats.exposedTools, total: decision.stats.totalTools, mode: config.toolRouter.mode === "observe" ? "OBSERVE" : decision.mode });
+        await store.append({ timestamp: new Date().toISOString(), sessionId: bridge.session.id, type: "TOOL_ROUTED", metadata: { mode: config.toolRouter.mode, decision: decision.mode, inputToolCount: decision.stats.totalTools, exposedToolCount: decision.stats.exposedTools } });
         // Observe retains the original tool map. Active removes only a policy-selected subset.
         if (config.toolRouter.mode === "active" && decision.mode === "ROUTED") event.tools = selectOpenCodeTools(event.tools, decision.selectedToolIds);
       } catch {

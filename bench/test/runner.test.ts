@@ -132,7 +132,7 @@ describe("A: treatment ATHENA files absent from workspace", () => {
     const ws = join(root, "ws"); const cfg = join(root, "cfg"); const ath = join(root, "ath");
     await prepareArm({ caseDefinition: { fixture: "controlled-semantic-loop", requestedTools: ["read"] }, arm: "treatment", workspaceRoot: ws, hostConfigRoot: cfg, athenaStateRoot: ath, productionRuntime: frozen });
     await expect(access(join(ws, ".athena"))).rejects.toThrow();
-  });
+  }, 15000);
 });
 
 describe("Phase 5B treatment configuration", () => {

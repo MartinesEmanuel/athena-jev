@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "experimentId": "athena-predator-swebench-pro-v2-pilot-001",
-  "status": "BLOCKED_MODEL_AND_HARBOR_CONTRACT_UNFROZEN",
+  "status": "DEVELOPMENT_MODEL_FROZEN_PENDING_PAID_APPROVAL",
   "dataset": {
     "publisher": "ScaleAI",
     "repository": "https://github.com/scaleapi/SWE-bench_Pro-os",
@@ -34,16 +34,16 @@
   "optionalReplication": { "tasks": 4, "conditions": ["baseline", "full"], "runsPerTask": 3, "requiresExplicitApproval": true },
   "randomization": { "seed": 20260924, "algorithm": "sha256-task-id-run-index-fisher-yates" },
   "statistics": { "label": "EXPLORATORY", "mcnemar": "exact-two-sided", "bootstrapSamples": 10000, "bootstrapSeed": 20260925 },
-  "model": {
-    "provider": "REQUIRED",
-    "modelId": "REQUIRED",
-    "endpointHost": "REQUIRED",
-    "reasoningEffort": "REQUIRED",
-    "sampling": "REQUIRED",
-    "temperature": "REQUIRED_OR_NOT_SUPPORTED",
-    "maxOutputTokens": "REQUIRED",
-    "timeout": "REQUIRED",
-    "providerDeterminism": "REQUIRED_OR_NOT_SUPPORTED"
+  "codingModel": {
+    "provider": "openai",
+    "modelId": "gpt-5.6-terra",
+    "endpointHost": "NOT_CONFIGURABLE",
+    "reasoningEffort": "medium",
+    "sampling": "NOT_CONFIGURABLE",
+    "temperature": "NOT_CONFIGURABLE",
+    "maxOutputTokens": "NOT_CONFIGURABLE",
+    "timeout": "NOT_CONFIGURABLE",
+    "providerSpecificSettings": "NOT_CONFIGURABLE"
   },
   "liveExecutionBlockers": [
     "Freeze every REQUIRED model field without credentials.",
