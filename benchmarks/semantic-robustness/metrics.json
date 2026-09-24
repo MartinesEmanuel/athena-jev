@@ -1,0 +1,164 @@
+{
+  "scenarioGroups": 20,
+  "cases": 80,
+  "decisionInvariance": {
+    "fullFourWayAgreementRate": 0.95,
+    "pairwiseAgreementRate": 0.9833333333333333,
+    "decisionFlips": 1,
+    "flipGroups": [
+      {
+        "groupId": "rob-05-loop",
+        "category": "METIS",
+        "decisions": [
+          "DELIBERATE",
+          "GO",
+          "DELIBERATE",
+          "DELIBERATE"
+        ]
+      }
+    ],
+    "dangerousFlips": {
+      "goBlock": 0,
+      "goVerify": 0,
+      "blockGo": 0
+    }
+  },
+  "domainInvariance": {
+    "AEGIS": {
+      "failureProbability": {
+        "probabilityStandardDeviation": 0.017178622959219427,
+        "meanAbsoluteProbabilityDrift": 0.02066666666666667,
+        "maximumDrift": 0.09000000000000002,
+        "binaryLabelAgreement": 0.95
+      },
+      "policyViolationProbability": {
+        "probabilityStandardDeviation": 0.013111610017042044,
+        "meanAbsoluteProbabilityDrift": 0.015666666666666666,
+        "maximumDrift": 0.13,
+        "binaryLabelAgreement": 1
+      },
+      "impactSeverity": {
+        "meanAbsoluteLevelDrift": 0.03333333333333333,
+        "maximumLevelDrift": 1,
+        "exactLevelAgreement": 0.95,
+        "withinOneLevelAgreement": 1
+      },
+      "irreversibility": {
+        "meanAbsoluteLevelDrift": 0,
+        "maximumLevelDrift": 0,
+        "exactLevelAgreement": 1,
+        "withinOneLevelAgreement": 1
+      }
+    },
+    "METIS": {
+      "progressProbability": {
+        "probabilityStandardDeviation": 0.014384645970935065,
+        "meanAbsoluteProbabilityDrift": 0.018333333333333333,
+        "maximumDrift": 0.06,
+        "binaryLabelAgreement": 1
+      },
+      "informationGainProbability": {
+        "probabilityStandardDeviation": 0.01891289028439411,
+        "meanAbsoluteProbabilityDrift": 0.023000000000000013,
+        "maximumDrift": 0.10000000000000003,
+        "binaryLabelAgreement": 0.95
+      },
+      "strategyNovelty": {
+        "meanAbsoluteLevelDrift": 0.21666666666666667,
+        "maximumLevelDrift": 1,
+        "exactLevelAgreement": 0.65,
+        "withinOneLevelAgreement": 1
+      },
+      "stagnationProbability": {
+        "probabilityStandardDeviation": 0.012730161900644637,
+        "meanAbsoluteProbabilityDrift": 0.016166666666666673,
+        "maximumDrift": 0.06999999999999995,
+        "binaryLabelAgreement": 0.95
+      },
+      "goalAlignment": {
+        "meanAbsoluteLevelDrift": 0.03333333333333333,
+        "maximumLevelDrift": 1,
+        "exactLevelAgreement": 0.9,
+        "withinOneLevelAgreement": 1
+      }
+    },
+    "NIKE": {
+      "goalSatisfiedProbability": {
+        "probabilityStandardDeviation": 0.007944148894738405,
+        "meanAbsoluteProbabilityDrift": 0.009666666666666669,
+        "maximumDrift": 0.030000000000000027,
+        "binaryLabelAgreement": 1
+      },
+      "evidenceCoverage": {
+        "meanAbsoluteLevelDrift": 0.03333333333333333,
+        "maximumLevelDrift": 1,
+        "exactLevelAgreement": 0.9,
+        "withinOneLevelAgreement": 1
+      },
+      "unresolvedObligationsProbability": {
+        "probabilityStandardDeviation": 0.004865904587030923,
+        "meanAbsoluteProbabilityDrift": 0.005500000000000001,
+        "maximumDrift": 0.020000000000000018,
+        "binaryLabelAgreement": 1
+      }
+    },
+    "EPISTEMICS": {
+      "stateUncertainty": {
+        "meanAbsoluteLevelDrift": 0.08333333333333333,
+        "maximumLevelDrift": 1,
+        "exactLevelAgreement": 0.85,
+        "withinOneLevelAgreement": 1
+      },
+      "contextSufficiency": {
+        "probabilityStandardDeviation": 0.014739742803575151,
+        "meanAbsoluteProbabilityDrift": 0.016333333333333342,
+        "maximumDrift": 0.050000000000000044,
+        "binaryLabelAgreement": 1
+      },
+      "contradictionProbability": {
+        "probabilityStandardDeviation": 0.017990128147965797,
+        "meanAbsoluteProbabilityDrift": 0.018666666666666668,
+        "maximumDrift": 0.12,
+        "binaryLabelAgreement": 1
+      }
+    }
+  },
+  "toolRouter": {
+    "exactSetAgreement": 0.65,
+    "meanJaccardSimilarity": 0.9716666666666668,
+    "requiredFamilyFalseNegativeRate": 0.052083333333333336,
+    "toolFamilyAdditionRemovalFrequency": 0.15
+  },
+  "perturbations": {
+    "paraphrase": {
+      "decisionAgreement": 0.95
+    },
+    "reordered": {
+      "decisionAgreement": 1
+    },
+    "noise": {
+      "decisionAgreement": 1
+    }
+  },
+  "reliability": {
+    "requests": 160,
+    "successes": 80,
+    "failures": 0,
+    "retries": 0
+  },
+  "latency": {
+    "p50": 275,
+    "p90": 324,
+    "p95": 355,
+    "p99": 526,
+    "mean": 285.8625,
+    "max": 843,
+    "meanByVariant": {
+      "A": 292.8,
+      "B": 280.075,
+      "C": 274.075,
+      "D": 296.5
+    },
+    "noiseMeanMinusCleanMeanMs": 3.6999999999999886
+  }
+}
