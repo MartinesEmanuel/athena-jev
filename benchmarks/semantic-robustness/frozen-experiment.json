@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "experimentId": "semantic-robustness-v1",
-  "athenaSha": "c66f155f1df1c935c3dccce7a006301cec69714f",
+  "athenaSha": "2042f3c5395d7bf1ec3f88e1c12a76c8fda51563",
   "datasetSha256": "512495811d336f901c8846fa03a6e77eeb98a0e7b29deabd87a9d5279e5d91c1",
   "scenarioGroups": 20,
   "caseCount": 80,
@@ -30,7 +30,7 @@
   "seeds": {
     "analysis": 20260924
   },
-  "timestamp": "2026-09-24T07:06:19.150Z",
+  "timestamp": "2026-09-24T07:08:32.384Z",
   "environment": {
     "node": "v22.23.2",
     "platform": "linux",
