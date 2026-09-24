@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.0.0",
   "experimentId": "athena-predator-swebench-pro-v2-pilot-001",
-  "status": "DEVELOPMENT_MODEL_FROZEN_PENDING_PAID_APPROVAL",
+  "status": "DEVELOPMENT_MODEL_FROZEN_PENDING_SECURE_CREDENTIAL_PROVISIONING",
   "dataset": {
     "publisher": "ScaleAI",
     "repository": "https://github.com/scaleapi/SWE-bench_Pro-os",
@@ -11,7 +11,7 @@
   "software": {
     "opencodeVersion": "2.0.14",
     "harborVersion": "0.23.0",
-    "athenaSourceCommit": "SET_BY_RELEASE_FREEZE"
+    "athenaSourceCommit": "2f0c83e5d9f8340d04301a234e58470ea8980557"
   },
   "conditions": {
     "baseline": {
@@ -35,15 +35,23 @@
   "randomization": { "seed": 20260924, "algorithm": "sha256-task-id-run-index-fisher-yates" },
   "statistics": { "label": "EXPLORATORY", "mcnemar": "exact-two-sided", "bootstrapSamples": 10000, "bootstrapSeed": 20260925 },
   "codingModel": {
-    "provider": "openai",
-    "modelId": "gpt-5.6-terra",
-    "endpointHost": "NOT_CONFIGURABLE",
-    "reasoningEffort": "medium",
+    "provider": "opencode",
+    "modelId": "big-pickle",
+    "fullModelId": "opencode/big-pickle",
+    "endpointHost": "https://opencode.ai/zen/v1/chat/completions",
+    "variant": "NOT_CONFIGURABLE",
+    "reasoningEffort": "NOT_CONFIGURABLE",
     "sampling": "NOT_CONFIGURABLE",
     "temperature": "NOT_CONFIGURABLE",
     "maxOutputTokens": "NOT_CONFIGURABLE",
     "timeout": "NOT_CONFIGURABLE",
-    "providerSpecificSettings": "NOT_CONFIGURABLE"
+    "providerSpecificSettings": "NOT_CONFIGURABLE",
+    "runtimeMetadata": {
+      "opencodeVersion": "2.0.14",
+      "modelListedByRuntime": true,
+      "hiddenBackendIdentity": "NOT_EXPOSED"
+    },
+    "frozenAtUtc": "2026-09-24T06:20:41Z"
   },
   "liveExecutionBlockers": [
     "Freeze every REQUIRED model field without credentials.",
