@@ -1,0 +1,15 @@
+{
+  "protocolVersion": "1.0.0",
+  "dataset": { "publisher": "ScaleAI", "repository": "https://github.com/scaleapi/SWE-bench_Pro-os", "commit": "66f92766bba642462d4bbe5479e83f91f9211862", "release": "v2.0.0", "expectedTasks": 642, "expectedRepositories": 11 },
+  "benchmarkSeed": 20260924,
+  "bootstrapSeed": 20260925,
+  "tasks": 22,
+  "runsPerTask": 1,
+  "conditions": ["baseline", "observe", "cognitive", "full"],
+  "timeoutSeconds": 3000,
+  "turnLimit": 250,
+  "workers": 1,
+  "infrastructureRetries": 2,
+  "model": { "provider": "REQUIRED", "id": "REQUIRED", "reasoningEffort": "REQUIRED" },
+  "networkPolicy": { "agent": "no-network", "allowedHost": "REQUIRED_MODEL_ENDPOINT", "disabledTools": ["WebFetch", "WebSearch"] }
+}

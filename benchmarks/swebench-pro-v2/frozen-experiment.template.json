@@ -1,0 +1,17 @@
+{
+  "experimentId": "athena-sbp-v2-confirmatory-001",
+  "status": "TEMPLATE_NOT_FROZEN",
+  "hypotheses": {
+    "H0": "ATHENA does not change paired task resolution probability relative to baseline.",
+    "H1": "ATHENA changes paired task resolution probability relative to baseline.",
+    "sidedness": "two-sided"
+  },
+  "primaryEndpoint": "official SWE-Bench Pro V2 pristine patch-replay resolved boolean",
+  "exclusionPolicy": "All scheduled trajectories are intention-to-run. Only preclassified GRADER_FAILURE, ENVIRONMENT_FAILURE, NETWORK_FAILURE, or INVALID_TASK may be excluded from valid-trajectory paired analysis; each remains in raw data. MODEL_FAILURE, HOST_FAILURE, ATHENA_FAILURE, JEV_FAILURE, TIMEOUT, bad/empty patch, and tool loop are outcomes.",
+  "statistics": { "primary": "exact two-sided McNemar", "bootstrap": { "samples": 10000, "seed": 20260925, "unit": "task pair" }, "secondary": "exploratory unless stated otherwise" },
+  "randomization": { "seed": 20260924, "method": "SHA-256 task-id/run-index seeded Fisher-Yates condition ordering" },
+  "stage1": { "tasks": 642, "conditions": ["baseline", "full"], "runsPerTask": 1 },
+  "stage2": { "selection": "predeclared condition-blind stratified sample using official repository/category metadata", "runsPerConditionTask": 3 },
+  "ablation": { "conditions": ["baseline", "observe", "cognitive", "router", "full"], "selection": "predeclared condition-blind stratified sample" },
+  "requiredBeforeFreeze": ["athenaSha", "opencodeVersion", "harborVersion", "model", "provider", "reasoningEffort", "sampling", "modelHost", "frozenConfigurationHash"]
+}

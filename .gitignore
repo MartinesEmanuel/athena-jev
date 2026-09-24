@@ -26,3 +26,5 @@ provider-response-*.json
 debug-*.json
 bench/results/
 bench/work/
+benchmarks/swebench-pro-v2/runs/
+benchmarks/swebench-pro-v2/reports/

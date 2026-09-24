@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+/* global process */
 /** Conservative release guardrail; use a dedicated scanner for history analysis. */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
