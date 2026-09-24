@@ -5,11 +5,21 @@
   "bootstrapSeed": 20260925,
   "tasks": 22,
   "runsPerTask": 1,
-  "conditions": ["baseline", "observe", "cognitive", "full"],
+  "conditions": ["baseline", "full"],
   "timeoutSeconds": 3000,
   "turnLimit": 250,
   "workers": 1,
   "infrastructureRetries": 2,
-  "model": { "provider": "REQUIRED", "id": "REQUIRED", "reasoningEffort": "REQUIRED" },
+  "model": {
+    "provider": "REQUIRED",
+    "id": "REQUIRED",
+    "endpointHost": "REQUIRED_MODEL_ENDPOINT",
+    "reasoningEffort": "REQUIRED",
+    "sampling": "REQUIRED",
+    "temperature": "REQUIRED_OR_NOT_SUPPORTED",
+    "maxOutputTokens": "REQUIRED",
+    "timeoutSeconds": "REQUIRED",
+    "providerDeterminism": "REQUIRED_OR_NOT_SUPPORTED"
+  },
   "networkPolicy": { "agent": "no-network", "allowedHost": "REQUIRED_MODEL_ENDPOINT", "disabledTools": ["WebFetch", "WebSearch"] }
 }

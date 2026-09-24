@@ -1,0 +1,15 @@
+name: Windows bootstrap syntax
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  parse:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Parse and run non-destructive preflight
+        shell: pwsh
+        run: |
+          [scriptblock]::Create((Get-Content -Raw scripts/predator-bootstrap.ps1)) | Out-Null
+          ./scripts/predator-bootstrap.ps1 -DryRun

@@ -1,0 +1,52 @@
+{
+  "schemaVersion": "1.0.0",
+  "experimentId": "athena-predator-swebench-pro-v2-pilot-001",
+  "status": "BLOCKED_MODEL_AND_HARBOR_CONTRACT_UNFROZEN",
+  "dataset": {
+    "publisher": "ScaleAI",
+    "repository": "https://github.com/scaleapi/SWE-bench_Pro-os",
+    "commit": "66f92766bba642462d4bbe5479e83f91f9211862",
+    "expectedTasks": 642
+  },
+  "software": {
+    "opencodeVersion": "2.0.14",
+    "harborVersion": "0.23.0",
+    "athenaSourceCommit": "SET_BY_RELEASE_FREEZE"
+  },
+  "conditions": {
+    "baseline": {
+      "athenaPlugin": "absent",
+      "athenaHooks": "absent",
+      "athenaContext": "absent",
+      "jevRequests": 0,
+      "toolRouterActivity": 0,
+      "athenaRuntimeState": "absent"
+    },
+    "full": {
+      "mode": "balanced",
+      "provider": "typesafe",
+      "enforcementMode": "enforce",
+      "toolRouter": { "mode": "active" }
+    }
+  },
+  "pilot": { "tasks": 22, "conditions": ["baseline", "full"], "runsPerTask": 1, "workers": 1 },
+  "sanity": { "tasks": 1, "conditions": ["baseline", "full"], "workers": 1 },
+  "optionalReplication": { "tasks": 4, "conditions": ["baseline", "full"], "runsPerTask": 3, "requiresExplicitApproval": true },
+  "randomization": { "seed": 20260924, "algorithm": "sha256-task-id-run-index-fisher-yates" },
+  "statistics": { "label": "EXPLORATORY", "mcnemar": "exact-two-sided", "bootstrapSamples": 10000, "bootstrapSeed": 20260925 },
+  "model": {
+    "provider": "REQUIRED",
+    "modelId": "REQUIRED",
+    "endpointHost": "REQUIRED",
+    "reasoningEffort": "REQUIRED",
+    "sampling": "REQUIRED",
+    "temperature": "REQUIRED_OR_NOT_SUPPORTED",
+    "maxOutputTokens": "REQUIRED",
+    "timeout": "REQUIRED",
+    "providerDeterminism": "REQUIRED_OR_NOT_SUPPORTED"
+  },
+  "liveExecutionBlockers": [
+    "Freeze every REQUIRED model field without credentials.",
+    "Verify Harbor 0.23.0's official SWE-Bench Pro V2 agent and PatchReplayAgent command/API contract."
+  ]
+}

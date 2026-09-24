@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "1.0.0",
+  "datasetCommit": "66f92766bba642462d4bbe5479e83f91f9211862",
+  "selection": "condition-blind stratified by repository parsed from official task directory metadata",
+  "seed": 20260924,
+  "expectedDatasetTasks": 642,
+  "tasks": [
+    {
+      "taskId": "instance_ansible__ansible-be59caa59bf47ca78a4760eb7ff38568372a8260-v1055803c3a812189a1133297f7f5468579283f86",
+      "repository": "ansible/ansible"
+    },
+    {
+      "taskId": "instance_ansible__ansible-bec27fb4c0a40c5f8bbcf26a475704227d65ee73-v30a923fb5c164d6cd18280c02422f75e611e8fb2",
+      "repository": "ansible/ansible"
+    },
+    {
+      "taskId": "instance_element-hq__element-web-18c03daa865d3c5b10e52b669cd50be34c67b2e5-vnan",
+      "repository": "element"
+    },
+    {
+      "taskId": "instance_element-hq__element-web-fe14847bb9bb07cab1b9c6c54335ff22ca5e516a-vnan",
+      "repository": "element"
+    },
+    {
+      "taskId": "instance_flipt-io__flipt-84806a178447e766380cc66b14dee9c6eeb534f4",
+      "repository": "flipt"
+    },
+    {
+      "taskId": "instance_flipt-io__flipt-b22f5f02e40b225b6b93fff472914973422e97c6",
+      "repository": "flipt"
+    },
+    {
+      "taskId": "instance_future-architect__vuls-01441351c3407abfc21c48a38e28828e1b504e0c",
+      "repository": "future"
+    },
+    {
+      "taskId": "instance_future-architect__vuls-e6c0da61324a0c04026ffd1c031436ee2be9503a",
+      "repository": "future"
+    },
+    {
+      "taskId": "instance_gravitational__teleport-005dcb16bacc6a5d5890c4cd302ccfd4298e275d-vee9b09fb20c43af7e520f57e9239bbcf46b7113d",
+      "repository": "gravitational/teleport"
+    },
+    {
+      "taskId": "instance_gravitational__teleport-769b4b5eec7286b7b14e179f2cc52e6b15d2d9f3-v626ec2a48416b10a88641359a169d99e935ff037",
+      "repository": "gravitational/teleport"
+    },
+    {
+      "taskId": "instance_internetarchive__openlibrary-f343c08f89c772f7ba6c0246f384b9e6c3dc0add-v08d8e8889ec945ab821fb156c04c7d2e2810debb",
+      "repository": "internetarchive/openlibrary"
+    },
+    {
+      "taskId": "instance_internetarchive__openlibrary-f8cc11d9c1575fdba5ac66aee0befca970da8d64-v13642507b4fc1f8d234172bf8129942da2c2ca26",
+      "repository": "internetarchive/openlibrary"
+    },
+    {
+      "taskId": "instance_navidrome__navidrome-8383527aaba1ae8fa9765e995a71a86c129ef626",
+      "repository": "navidrome/navidrome"
+    },
+    {
+      "taskId": "instance_navidrome__navidrome-bf2bcb12799b21069f137749e0c331f761d1f693",
+      "repository": "navidrome/navidrome"
+    },
+    {
+      "taskId": "instance_NodeBB__NodeBB-4327a09d76f10a79109da9d91c22120428d3bdb9-vnan",
+      "repository": "NodeBB/NodeBB"
+    },
+    {
+      "taskId": "instance_NodeBB__NodeBB-97c8569a798075c50e93e585ac741ab55cb7c28b-vf2cf3cbd463b7ad942381f1c6d077626485a1e9e",
+      "repository": "NodeBB/NodeBB"
+    },
+    {
+      "taskId": "instance_protonmail__webclients-715dbd4e6999499cd2a576a532d8214f75189116",
+      "repository": "protonmail/webclients"
+    },
+    {
+      "taskId": "instance_protonmail__webclients-944adbfe06644be0789f59b78395bdd8567d8547",
+      "repository": "protonmail/webclients"
+    },
+    {
+      "taskId": "instance_qutebrowser__qutebrowser-01d1d1494411380d97cac14614a829d3a69cecaf-v2ef375ac784985212b1805e1d0431dc8f1b3c171",
+      "repository": "qutebrowser/qutebrowser"
+    },
+    {
+      "taskId": "instance_qutebrowser__qutebrowser-322834d0e6bf17e5661145c9f085b41215c280e8-v488d33dd1b2540b234cbb0468af6b6614941ce8f",
+      "repository": "qutebrowser/qutebrowser"
+    },
+    {
+      "taskId": "instance_tutao__tutanota-f373ac3808deefce8183dad8d16729839cc330c1-v2939aa9f4356f0dc9f523ee5ce19d09e08ab979b",
+      "repository": "tutao/tutanota"
+    },
+    {
+      "taskId": "instance_tutao__tutanota-f3ffe17af6e8ab007e8d461355057ad237846d9d-vbc0d9ba8f0071fbe982809910959a6ff8884dbbf",
+      "repository": "tutao/tutanota"
+    }
+  ]
+}
