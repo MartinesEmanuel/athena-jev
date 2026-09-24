@@ -16,12 +16,16 @@ function parse(value: unknown, families: readonly ToolFamily[]): Partial<Record<
 /** Host-independent Jev semantic layer. It receives only compact redacted state. */
 export class TypeSafeToolRoutingJudge implements ToolRoutingJudge {
   private readonly client: TypeSafeClient;
+  /** Typed provider output from the most recent call, for sanitized evaluation logs. */
+  latestRawTypedOutput: unknown | undefined;
   constructor(timeout = 2500, client?: TypeSafeClient) {
     if (!process.env.TYPESAFE_API_KEY && !client) throw new Error("TYPESAFE_API_KEY is missing");
     this.client = client ?? new TypeSafeClient({ timeout });
   }
   async judge(state: ToolRoutingState, families: readonly ToolFamily[]): Promise<Partial<Record<ToolFamily, number>>> {
     const questions = Object.fromEntries(families.map((family) => [family, noul(`Is ${family} capability useful for making progress on the next immediate step? Answer only from the compact task state; this is capability routing, not an action decision.`)]));
-    return parse(await this.client.systemOne({ state: JSON.stringify({ kind: "athena-tool-routing", state }), questions }), families);
+    const rawTypedOutput = await this.client.systemOne({ state: JSON.stringify({ kind: "athena-tool-routing", state }), questions });
+    this.latestRawTypedOutput = rawTypedOutput;
+    return parse(rawTypedOutput, families);
   }
 }
