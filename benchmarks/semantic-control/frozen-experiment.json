@@ -1,7 +1,7 @@
 {
   "schemaVersion": 1,
   "experimentId": "semantic-control-final-v1",
-  "athenaSha": "26c0ed2ae0c7159e89f47121e45141c575ce6462",
+  "athenaSha": "2e347ba52cdc3a9f1eee04ecf7b28426a06bb620",
   "datasetSha256": "8584a7f7876bc9a1e00930ea3a7727735bbb088d347892b000cea6c58adaddf9",
   "caseCount": 120,
   "typeSafeProvider": "REAL TypeSafe/Jev via @athena/typesafe TypeSafeSystem1Runtime",
@@ -39,7 +39,7 @@
     "bootstrap": 20260924,
     "dataset": 20260924
   },
-  "timestamp": "2026-09-24T06:43:49.078Z",
+  "timestamp": "2026-09-24T06:44:08.193Z",
   "environment": {
     "node": "v22.23.2",
     "platform": "linux",
